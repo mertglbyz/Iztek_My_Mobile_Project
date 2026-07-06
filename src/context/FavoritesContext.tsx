@@ -46,7 +46,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
-    const removeFavorite = useCallback(async (stopId: string) => {
+    const removeFavorite = useCallback(async (stopId: number) => {
         setFavorites((prev) => {
             const updated = prev.filter((s) => s.id !== stopId);
             saveFavorites(updated);
@@ -55,7 +55,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const isFavorite = useCallback(
-        (stopId: string) => favorites.some((s) => s.id === stopId),
+        (stopId: number) => favorites.some((s) => s.id === stopId),
         [favorites]
     );
 

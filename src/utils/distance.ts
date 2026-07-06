@@ -64,7 +64,7 @@ export function filterStops(stops: BusStop[], query: string): BusStop[] {
     return stops.filter(
         (stop) =>
             stop.name.toLowerCase().includes(q) ||
-            stop.stopNumber.toLowerCase().includes(q) ||
+            stop.id.toString().includes(q) ||
             stop.routes.some((r) => r.toLowerCase().includes(q))
     );
 }

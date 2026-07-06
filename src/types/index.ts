@@ -4,9 +4,10 @@
 
 /** ESHOT durak bilgisi */
 export interface BusStop {
-  id: string;
+  /** 5 haneli durak kimliği (ör. 12234) */
+  id: number;
+  /** Durak adı (ör. "Konak İskele") */
   name: string;
-  stopNumber: string;
   latitude: number;
   longitude: number;
   district: string;
@@ -14,14 +15,23 @@ export interface BusStop {
   isFavorite?: boolean;
 }
 
+/** Favori hat bilgisi */
+export interface BusRoute {
+  id: string;
+  routeNumber: string;
+  title: string;
+  operatingHours: string;
+  hasAnnouncement?: boolean;
+}
+
 /** Durağa yaklaşan otobüs */
 export interface ApproachingBus {
   id: string;
   routeNumber: string;
   destination: string;
-  estimatedMinutes: number;   // dakika cinsinden tahmini süre
-  isAccessible: boolean;       // engelli erişimi var mı
-  isLowFloor: boolean;         // alçak tabanlı mı
+  estimatedMinutes: number;
+  isAccessible: boolean;
+  isLowFloor: boolean;
 }
 
 /** Kullanıcı konumu */
@@ -39,8 +49,8 @@ export interface BusStopWithDistance extends BusStop {
 export interface FavoritesContextType {
   favorites: BusStop[];
   addFavorite: (stop: BusStop) => Promise<void>;
-  removeFavorite: (stopId: string) => Promise<void>;
-  isFavorite: (stopId: string) => boolean;
+  removeFavorite: (stopId: number) => Promise<void>;
+  isFavorite: (stopId: number) => boolean;
   isLoading: boolean;
 }
 

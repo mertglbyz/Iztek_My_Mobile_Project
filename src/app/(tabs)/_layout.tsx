@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
@@ -19,7 +19,7 @@ export default function TabsLayout() {
                     paddingTop: 8,
                 },
                 tabBarLabelStyle: {
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: '600',
                 },
             }}
@@ -43,11 +43,20 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="favorites"
+                name="directions"
                 options={{
-                    title: 'Favoriler',
+                    title: 'Nasıl Giderim',
                     tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="star" size={size} color={color} />
+                        <Ionicons name="navigate" size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="routes"
+                options={{
+                    title: 'Hatlar',
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="bus" size={size} color={color} />
                     ),
                 }}
             />
