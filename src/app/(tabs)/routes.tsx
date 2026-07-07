@@ -1,8 +1,9 @@
 import ScreenHeader from '@/components/common/ScreenHeader';
 import FavoriteListItem from '@/components/home/FavoriteListItem';
-import { MOCK_ROUTES } from '@/data/mockRoutes';
 import { BorderRadius, Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
+import { MOCK_ROUTES } from '@/data/mockRoutes';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -66,7 +67,7 @@ export default function RoutesScreen() {
                             badgeText={route.routeNumber}
                             title={route.title}
                             subtitle={route.operatingHours}
-                            onPress={() => console.log(`Hat detay: ${route.routeNumber}`)}
+                            onPress={() => router.push(`/route/${route.id}`)}
                             hasAnnouncement={route.hasAnnouncement}
                             onPressAnnouncement={() => console.log('Duyuru')}
                         />

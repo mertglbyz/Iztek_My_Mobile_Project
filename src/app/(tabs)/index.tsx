@@ -10,40 +10,28 @@ import Header from '@/components/home/Header';
 import SearchBar from '@/components/home/SearchBar';
 import TabbedList from '@/components/home/TabbedList';
 
+import HomeSearchOverlay from '@/components/home/HomeSearchOverlay';
+import StopDetailSheet from '@/components/stops/StopDetailSheet';
 import { Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
-import { BusRoute } from '@/types';
-
-interface FavoriteStopPreview {
-    id: number;
-    name: string;
-    nextArrival: string;
-}
+import { useFavorites } from '@/context/FavoritesContext';
+import { BusStopWithDistance } from '@/types';
 
 export default function HomeScreen() {
+    const { favoriteRoutes, favoriteStops, removeFavoriteRoute, addFavoriteStop, removeFavoriteStop, isFavoriteStop } = useFavorites();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState(0);
 
-    const favoriteRoutes: BusRoute[] = [
-        {
-            id: 'route-72',
-            routeNumber: '72',
-            title: 'İŞÇİEVLERİ — KONAK',
-            operatingHours: '06:05 – 23:12',
-            hasAnnouncement: true,
-        },
-        {
-            id: 'route-35',
-            routeNumber: '35',
-            title: 'KARŞIYAKA — ALSANCAK',
-            operatingHours: '06:30 – 23:45',
-            hasAnnouncement: false,
-        },
-    ];
+    const [selectedStop, setSelectedStop] = useState<BusStopWithDistance | null>(null);
 
-    const favoriteStops: FavoriteStopPreview[] = [
-        { id: 12234, name: 'Bostanlı İskele', nextArrival: 'En yakın: 3 dk' },
-        { id: 40328, name: 'Karşıyaka İskele', nextArrival: 'En yakın: 7 dk' },
-    ];
+    const handlePressRoute = (routeId: string) => {
+        setSearchQuery('');
+        router.push(`/route/${routeId}`);
+    };
+
+    const handlePressStop = (stop: BusStopWithDistance) => {
+        setSearchQuery('');
+        setSelectedStop(stop);
+    };
 
     return (
         <View style={styles.container}>
@@ -54,6 +42,12 @@ export default function HomeScreen() {
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     onPressQr={() => console.log('QR tarayıcı açıldı')}
+                />
+                <HomeSearchOverlay
+                    searchQuery={searchQuery}
+                    onClose={() => setSearchQuery('')}
+                    onPressRoute={handlePressRoute}
+                    onPressStop={handlePressStop}
                 />
 
                 <ScrollView
@@ -105,34 +99,53 @@ export default function HomeScreen() {
                             onTabChange={setActiveTab}
                         >
                             {activeTab === 0 ? (
-                                favoriteRoutes.map((route) => (
+                                favoriteRoutes.length > 0 ? favoriteRoutes.map((route) => (
                                     <FavoriteListItem
                                         key={route.id}
                                         variant="route"
                                         badgeText={route.routeNumber}
                                         title={route.title}
                                         subtitle={route.operatingHours}
-                                        onPress={() => console.log(`Hat: ${route.routeNumber}`)}
+                                        onPress={() => router.push(`/route/${route.id}`)}
                                         hasAnnouncement={route.hasAnnouncement}
-                                        onPressAnnouncement={() => console.log('Duyuru')}
                                     />
-                                ))
+                                )) : (
+                                    <Text style={styles.emptyText}>Henüz favori hattınız yok.</Text>
+                                )
                             ) : (
-                                favoriteStops.map((stop) => (
+                                favoriteStops.length > 0 ? favoriteStops.map((stop) => (
                                     <FavoriteListItem
                                         key={stop.id}
                                         variant="stop"
                                         badgeText="D"
                                         title={stop.name}
                                         metaLabel={`Durak ID: ${stop.id}`}
-                                        subtitle={stop.nextArrival}
-                                        onPress={() => console.log(`Durak: ${stop.id}`)}
+                                        subtitle={stop.district}
+                                        onPress={() => handlePressStop({ ...stop, distanceMeters: 0 })}
                                     />
-                                ))
+                                )) : (
+                                    <Text style={styles.emptyText}>Henüz favori durağınız yok.</Text>
+                                )
                             )}
                         </TabbedList>
                     </View>
                 </ScrollView>
+
+                <StopDetailSheet
+                    stop={selectedStop}
+                    visible={selectedStop !== null}
+                    isFavorite={selectedStop ? isFavoriteStop(selectedStop.id) : false}
+                    onClose={() => setSelectedStop(null)}
+                    onToggleFavorite={() => {
+                        if (selectedStop) {
+                            if (isFavoriteStop(selectedStop.id)) {
+                                removeFavoriteStop(selectedStop.id);
+                            } else {
+                                addFavoriteStop(selectedStop);
+                            }
+                        }
+                    }}
+                />
             </SafeAreaView>
         </View>
     );
@@ -171,5 +184,11 @@ const styles = StyleSheet.create({
     favoritesSection: {
         flex: 1,
         marginTop: Spacing.sm,
+    },
+    emptyText: {
+        fontSize: FontSizes.sm,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: Spacing.xl,
     },
 });

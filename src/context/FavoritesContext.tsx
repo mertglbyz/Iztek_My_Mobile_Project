@@ -1,13 +1,15 @@
-import { BusStop, FavoritesContextType } from '@/types';
+import { BusRoute, BusStop, FavoritesContextType } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-const FAVORITES_KEY = '@durak_yakinimda:favorites';
+const FAVORITES_STOPS_KEY = '@durak_yakinimda:favorite_stops';
+const FAVORITES_ROUTES_KEY = '@durak_yakinimda:favorite_routes';
 
 const FavoritesContext = createContext<FavoritesContextType | null>(null);
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
-    const [favorites, setFavorites] = useState<BusStop[]>([]);
+    const [favoriteStops, setFavoriteStops] = useState<BusStop[]>([]);
+    const [favoriteRoutes, setFavoriteRoutes] = useState<BusRoute[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Uygulama açılışında favorileri yükle
@@ -17,10 +19,13 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
     const loadFavorites = async () => {
         try {
-            const stored = await AsyncStorage.getItem(FAVORITES_KEY);
-            if (stored) {
-                setFavorites(JSON.parse(stored));
-            }
+            const [storedStops, storedRoutes] = await Promise.all([
+                AsyncStorage.getItem(FAVORITES_STOPS_KEY),
+                AsyncStorage.getItem(FAVORITES_ROUTES_KEY)
+            ]);
+
+            if (storedStops) setFavoriteStops(JSON.parse(storedStops));
+            if (storedRoutes) setFavoriteRoutes(JSON.parse(storedRoutes));
         } catch (error) {
             console.error('Favoriler yüklenemedi:', error);
         } finally {
@@ -28,40 +33,83 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const saveFavorites = async (newFavorites: BusStop[]) => {
+    const saveFavoriteStops = async (newFavorites: BusStop[]) => {
         try {
-            await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(newFavorites));
+            await AsyncStorage.setItem(FAVORITES_STOPS_KEY, JSON.stringify(newFavorites));
         } catch (error) {
-            console.error('Favoriler kaydedilemedi:', error);
+            console.error('Favori duraklar kaydedilemedi:', error);
         }
     };
 
-    const addFavorite = useCallback(async (stop: BusStop) => {
-        setFavorites((prev) => {
+    const saveFavoriteRoutes = async (newFavorites: BusRoute[]) => {
+        try {
+            await AsyncStorage.setItem(FAVORITES_ROUTES_KEY, JSON.stringify(newFavorites));
+        } catch (error) {
+            console.error('Favori hatlar kaydedilemedi:', error);
+        }
+    };
+
+    // ----- DURAKLAR İÇİN -----
+    const addFavoriteStop = useCallback(async (stop: BusStop) => {
+        setFavoriteStops((prev) => {
             const alreadyExists = prev.some((s) => s.id === stop.id);
             if (alreadyExists) return prev;
             const updated = [...prev, { ...stop, isFavorite: true }];
-            saveFavorites(updated);
+            saveFavoriteStops(updated);
             return updated;
         });
     }, []);
 
-    const removeFavorite = useCallback(async (stopId: number) => {
-        setFavorites((prev) => {
+    const removeFavoriteStop = useCallback(async (stopId: number) => {
+        setFavoriteStops((prev) => {
             const updated = prev.filter((s) => s.id !== stopId);
-            saveFavorites(updated);
+            saveFavoriteStops(updated);
             return updated;
         });
     }, []);
 
-    const isFavorite = useCallback(
-        (stopId: number) => favorites.some((s) => s.id === stopId),
-        [favorites]
+    const isFavoriteStop = useCallback(
+        (stopId: number) => favoriteStops.some((s) => s.id === stopId),
+        [favoriteStops]
+    );
+
+    // ----- HATLAR İÇİN -----
+    const addFavoriteRoute = useCallback(async (route: BusRoute) => {
+        setFavoriteRoutes((prev) => {
+            const alreadyExists = prev.some((r) => r.id === route.id);
+            if (alreadyExists) return prev;
+            const updated = [...prev, { ...route, isFavorite: true }];
+            saveFavoriteRoutes(updated);
+            return updated;
+        });
+    }, []);
+
+    const removeFavoriteRoute = useCallback(async (routeId: string) => {
+        setFavoriteRoutes((prev) => {
+            const updated = prev.filter((r) => r.id !== routeId);
+            saveFavoriteRoutes(updated);
+            return updated;
+        });
+    }, []);
+
+    const isFavoriteRoute = useCallback(
+        (routeId: string) => favoriteRoutes.some((r) => r.id === routeId),
+        [favoriteRoutes]
     );
 
     return (
         <FavoritesContext.Provider
-            value={{ favorites, addFavorite, removeFavorite, isFavorite, isLoading }}
+            value={{
+                favoriteStops,
+                favoriteRoutes,
+                addFavoriteStop,
+                removeFavoriteStop,
+                isFavoriteStop,
+                addFavoriteRoute,
+                removeFavoriteRoute,
+                isFavoriteRoute,
+                isLoading
+            }}
         >
             {children}
         </FavoritesContext.Provider>

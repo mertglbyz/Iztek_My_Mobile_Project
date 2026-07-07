@@ -22,6 +22,7 @@ export interface BusRoute {
   title: string;
   operatingHours: string;
   hasAnnouncement?: boolean;
+  stops?: number[]; // Hangi duraklardan geçtiği (id listesi)
 }
 
 /** Durağa yaklaşan otobüs */
@@ -47,10 +48,14 @@ export interface BusStopWithDistance extends BusStop {
 
 /** Favori context tipi */
 export interface FavoritesContextType {
-  favorites: BusStop[];
-  addFavorite: (stop: BusStop) => Promise<void>;
-  removeFavorite: (stopId: number) => Promise<void>;
-  isFavorite: (stopId: number) => boolean;
+  favoriteStops: BusStop[];
+  favoriteRoutes: BusRoute[];
+  addFavoriteStop: (stop: BusStop) => Promise<void>;
+  removeFavoriteStop: (stopId: number) => Promise<void>;
+  isFavoriteStop: (stopId: number) => boolean;
+  addFavoriteRoute: (route: BusRoute) => Promise<void>;
+  removeFavoriteRoute: (routeId: string) => Promise<void>;
+  isFavoriteRoute: (routeId: string) => boolean;
   isLoading: boolean;
 }
 
