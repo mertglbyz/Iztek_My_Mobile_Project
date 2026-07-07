@@ -34,13 +34,13 @@
 
 - Alan adı: `DURAKTAN_GECEN_HATLAR`
 - Açıklaması: O duraktan geçen otobüs hatlarının numaraları (Örn: `29-30`).
-- Veri tipi: `string` (Metin)
+- Veri tipi: `string` (Metin) - *Uygulama içinde number[] olarak dönüştürülecek.*
 - Uygulamada kullanılacak mı: Evet
 - Kullanım amacı: Durak detay ekranında, o duraktan hangi hatların geçtiğini listelemek.
 
 ## Veri Kalitesi Notları
-- Eksik alan var mı: Evet. Yapılan analizde `DURAKTAN_GECEN_HATLAR` sütununda çokça boş (null) kayıt tespit edilmiştir. Bu duraklar için UI tarafında "Hat bilgisi bulunamadı" gibi bir fallback (yedek) state yazılmalıdır.
+- Eksik alan var mı: Evet. Yapılan analizde `DURAKTAN_GECEN_HATLAR` sütununda **tam 80 adet** boş (null) kayıt tespit edilmiştir. Bu duraklar için kod tarafında null kontrolü yapılmalı ve uygulamanın çökmemesi için UI tarafında "Hat bilgisi bulunamadı" gibi bir fallback (yedek) state yazılmalıdır.
 - Tekrarlayan kayıt var mı: `DURAK_ID` alanları genel olarak tekil görünüyor ancak aynı isimde (Örn: iki farklı yöndeki "Bahribaba" durağı) kayıtlar mevcut (ID: 10005 ve ID: 10007).
 - Koordinat alanları uygun mu: Koordinatlar doğrudan virgüllü (float) sayı tipinde. Mobil harita kütüphaneleriyle ekstra dönüşüm olmadan çalışmaya uygun.
 - Duraktan geçen hat alanı nasıl tutuluyor: Veriler dizi (array) yerine tire (`-`) veya benzeri ayırıcılarla tek bir string olarak tutulmuş (Örn: `29-30`). 
-- Uygulamada dönüşüm gerektiriyor mu: Evet. `DURAKTAN_GECEN_HATLAR` metnini mobil uygulamada ekrana basarken `.split('-')` metodunu kullanarak bir string dizisine çevirmemiz (parse etmemiz) gerekecek.
+- Uygulamada dönüşüm gerektiriyor mu: Evet. `DURAKTAN_GECEN_HATLAR` metnini mobil uygulamada API'den dönen verilerle uyumlu hale getirmek için, `.split('-').map(Number)` metodunu kullanarak **sayısal bir diziye (number array)** çevirmemiz (parse etmemiz) gerekmektedir.
