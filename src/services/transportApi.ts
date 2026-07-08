@@ -22,10 +22,10 @@ export const getStops = async () => {
 
 /**
  * Belirli bir durak ID'si için durağa yaklaşan otobüsleri API'den çeker.
- * @param {number} stopId - Yaklaşan araçları sorgulanacak durağın tekil ID'si.
+ * @param {string} stopId - Yaklaşan araçları sorgulanacak durağın tekil ID'si.
  * @returns {Promise<ApproachingBus[]>} API'den gelen verinin ApproachingBus modeline dönüştürülmüş hali.
  */
-export const getApproachingBuses = async (stopId: number) => {
+export const getApproachingBuses = async (stopId: string) => {
   // TODO: https://openapi.izmir.bel.tr/api/iztek/duragayaklasanotobusler/{stopId} adresine GET isteği atılacak.
   // DİKKAT: API'den gelen KoorX ve KoorY değerleri virgüllü string. 
   // Harita bileşeni için float (number) tipe çevrilirken virgül noktaya dönüştürülmeli:
@@ -36,10 +36,10 @@ export const getApproachingBuses = async (stopId: number) => {
 
 /**
  * Belirli bir hatta aktif olarak çalışan tüm otobüslerin anlık konumlarını API'den çeker.
- * @param {number} routeNumber - Sorgulanacak hattın numarası (Örn: 277).
+ * @param {string} routeNumber - Sorgulanacak hattın numarası (Örn: "277").
  * @returns {Promise<any[]>} Hatta ait araçların anlık konum bilgileri.
  */
-export const getRouteVehicles = async (routeNumber: number) => {
+export const getRouteVehicles = async (routeNumber: string) => {
   // TODO: https://openapi.izmir.bel.tr/api/iztek/hatotobuskonumlari/{routeNumber} adresine GET isteği atılacak.
   // Örn: return routeVehicles;
 };

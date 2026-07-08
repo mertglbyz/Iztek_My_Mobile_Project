@@ -5,17 +5,17 @@ Bu belge, açık veri kaynaklarından (CSV ve API) gelen raw (ham) verilerin, mo
 ## 1. Stop (Durak Modeli)
 CSV dosyasından okunan durak verilerinin harita ve liste ekranlarında kullanılacak uygulama içi modelidir.
 
-- **id**: `number` *(CSV'deki `DURAK_ID` alanından eşleşir)*
+- **id**: `string` *(CSV'deki `DURAK_ID` alanından eşleşir. API isteklerinde referans kolaylığı için metin formatında tutulur)*
 - **name**: `string` *(CSV'deki `DURAK_ADI` alanından eşleşir)*
 - **latitude**: `number` *(CSV'deki `ENLEM` alanından eşleşir)*
 - **longitude**: `number` *(CSV'deki `BOYLAM` alanından eşleşir)*
-- **routes**: `number[]` *(CSV'deki `DURAKTAN_GECEN_HATLAR` alanındaki string verinin tire (`-`) işaretinden parçalanıp sayı formatına dönüştürülmüş (`.map(Number)`) dizi halidir)*
+- **routes**: `string[]` *(CSV'deki `DURAKTAN_GECEN_HATLAR` alanındaki string verinin tire (`-`) işaretinden parçalanıp dizi halidir. Servis parametreleriyle uyumlu olması için metin dizisi olarak bırakılmıştır)*
 
 ## 2. ApproachingBus (Yaklaşan Otobüs Modeli)
 "Durağa Yaklaşan Otobüsler API"sinden gelen verinin uygulama içi modelidir.
 
-- **busId**: `number` *(API'deki `OtobusId` alanından eşleşir)*
-- **routeNumber**: `number` *(API'deki `HatNumarasi` alanından eşleşir)*
+- **busId**: `string` *(API'deki `OtobusId` alanından eşleşir)*
+- **routeNumber**: `string` *(API'deki `HatNumarasi` alanından eşleşir)*
 - **routeName**: `string` *(API'deki `HatAdi` alanından eşleşir)*
 - **remainingStopCount**: `number` *(API'deki `KalanDurakSayisi` alanından eşleşir)*
 - **direction**: `number` *(API'deki `HattinYonu` alanından eşleşir. Gidiş/Dönüş durumunu belirtir)*
