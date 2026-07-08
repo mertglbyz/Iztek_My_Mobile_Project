@@ -1,7 +1,6 @@
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { MOCK_ROUTES } from '@/data/mockRoutes';
-import { MOCK_STOPS } from '@/data/mockStops';
-import { BusRoute, BusStopWithDistance } from '@/types';
+import { BusRoute, BusStop, BusStopWithDistance } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -16,6 +15,7 @@ interface HomeSearchOverlayProps {
     onClose: () => void;
     onPressRoute: (routeId: string) => void;
     onPressStop: (stop: BusStopWithDistance) => void;
+    allStops: BusStop[];
 }
 
 export default function HomeSearchOverlay({
@@ -23,25 +23,33 @@ export default function HomeSearchOverlay({
     onClose,
     onPressRoute,
     onPressStop,
+    allStops,
 }: HomeSearchOverlayProps) {
 
     const results = useMemo(() => {
         if (!searchQuery.trim() || searchQuery.length < 2) return [];
 
-        const q = searchQuery.toLowerCase().trim();
+        const q = searchQuery.toLocaleLowerCase('tr-TR').trim();
         const foundRoutes = MOCK_ROUTES.filter(
-            (r) => r.routeNumber.toLowerCase().includes(q) || r.title.toLowerCase().includes(q)
+            (r) => r.routeNumber.toLocaleLowerCase('tr-TR').includes(q) || r.title.toLocaleLowerCase('tr-TR').includes(q)
         ).map((r) => ({ type: 'route' as const, item: r }));
 
-        const foundStops = MOCK_STOPS.filter(
-            (s) => s.id.toString().includes(q) || s.name.toLowerCase().includes(q)
-        ).map((s) => ({
+        const foundStops = allStops.filter(s => {
+            if (s.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
+            if (s.id.toString().includes(q)) return true;
+
+            const qNum = Number(q);
+            if (!isNaN(qNum) && s.routes.includes(qNum)) return true;
+
+            return false;
+        }).map((s) => ({
             type: 'stop' as const,
-            item: { ...s, distanceMeters: 0 }, // Search overlay'de mesafe 0 gösterilebilir veya opsiyonel kalır
+            item: { ...s, distanceMeters: 0 },
         }));
 
-        return [...foundRoutes, ...foundStops];
-    }, [searchQuery]);
+        // Limit the rendering to top 50 items so the app doesn't freeze when searching a short string among 11000 items
+        return [...foundRoutes, ...foundStops].slice(0, 50);
+    }, [searchQuery, allStops]);
 
     if (!searchQuery.trim() || searchQuery.length < 2) {
         return null; // En az 2 karakter girilmemişse overlay gösterme
@@ -100,7 +108,7 @@ export default function HomeSearchOverlay({
                 ) : (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="search-outline" size={32} color={Colors.gray400} />
-                        <Text style={styles.emptyText}>Sonuç bulunamadı</Text>
+                        <Text style={styles.emptyText}>Arama sonucu yok</Text>
                     </View>
                 )}
             </View>
@@ -110,11 +118,7 @@ export default function HomeSearchOverlay({
 
 const styles = StyleSheet.create({
     container: {
-        position: 'absolute',
-        top: 140, // Header ve SearchBar'ın yaklaşık boyutu
-        left: 0,
-        right: 0,
-        bottom: 0,
+        ...StyleSheet.absoluteFillObject,
         zIndex: 100,
     },
     backdrop: {

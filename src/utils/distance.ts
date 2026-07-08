@@ -61,11 +61,14 @@ export function getSortedStopsByDistance(
 export function filterStops(stops: BusStop[], query: string): BusStop[] {
     const q = query.toLowerCase().trim();
     if (!q) return stops;
+
+    const qNum = Number(q);
+
     return stops.filter(
         (stop) =>
             stop.name.toLowerCase().includes(q) ||
             stop.id.toString().includes(q) ||
-            stop.routes.some((r) => r.toLowerCase().includes(q))
+            (!isNaN(qNum) && stop.routes.includes(qNum))
     );
 }
 

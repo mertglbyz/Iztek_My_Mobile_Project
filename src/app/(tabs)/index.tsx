@@ -11,17 +11,16 @@ import SearchBar from '@/components/home/SearchBar';
 import TabbedList from '@/components/home/TabbedList';
 
 import HomeSearchOverlay from '@/components/home/HomeSearchOverlay';
-import StopDetailSheet from '@/components/stops/StopDetailSheet';
 import { Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
+import { useStops } from '@/context/StopsContext';
 import { BusStopWithDistance } from '@/types';
 
 export default function HomeScreen() {
     const { favoriteRoutes, favoriteStops, removeFavoriteRoute, addFavoriteStop, removeFavoriteStop, isFavoriteStop } = useFavorites();
+    const { stops: allStops } = useStops();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState(0);
-
-    const [selectedStop, setSelectedStop] = useState<BusStopWithDistance | null>(null);
 
     const handlePressRoute = (routeId: string) => {
         setSearchQuery('');
@@ -30,122 +29,115 @@ export default function HomeScreen() {
 
     const handlePressStop = (stop: BusStopWithDistance) => {
         setSearchQuery('');
-        setSelectedStop(stop);
+        router.push(`/stop/${stop.id}` as any);
     };
 
     return (
         <View style={styles.container}>
             <FocusStatusBar style="dark" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <Header userName="Mert" />
+                <Header />
                 <SearchBar
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     onPressQr={() => console.log('QR tarayıcı açıldı')}
                 />
-                <HomeSearchOverlay
-                    searchQuery={searchQuery}
-                    onClose={() => setSearchQuery('')}
-                    onPressRoute={handlePressRoute}
-                    onPressStop={handlePressStop}
-                />
 
-                <ScrollView
-                    style={styles.scrollView}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
-                >
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Hızlı Erişim</Text>
-                    </View>
-
+                {/* Alt kısımdaki her şeyi (liste ve arama sonucu) kapsayan Wrapper */}
+                <View style={styles.contentWrapper}>
                     <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.actionCardsScroll}
+                        style={styles.scrollView}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
                     >
-                        <ActionCard
-                            title="Yakınımdaki Duraklar"
-                            description="Konumunuza en yakın durakları görün"
-                            iconName="navigate-circle-outline"
-                            iconColor={Colors.primary}
-                            iconBg={Colors.primarySoft}
-                            onPress={() => router.push('/(tabs)/nearby')}
-                        />
-                        <View style={styles.cardGap} />
-                        <ActionCard
-                            title="Nasıl Giderim"
-                            description="Başlangıç ve varış noktası seçin"
-                            iconName="map-outline"
-                            iconColor={Colors.accent}
-                            iconBg={Colors.accentSoft}
-                            onPress={() => router.push('/(tabs)/directions')}
-                        />
-                        <View style={styles.cardGap} />
-                        <ActionCard
-                            title="Hatlar"
-                            description="Tüm ESHOT hatlarını keşfedin"
-                            iconName="bus-outline"
-                            iconColor={Colors.success}
-                            iconBg={Colors.successSoft}
-                            onPress={() => router.push('/(tabs)/routes')}
-                        />
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Hızlı Erişim</Text>
+                        </View>
+
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.actionCardsScroll}
+                        >
+                            <ActionCard
+                                title="Yakınımdaki Duraklar"
+                                description="Konumunuza en yakın durakları görün"
+                                iconName="navigate-circle-outline"
+                                iconColor={Colors.primary}
+                                iconBg={Colors.primarySoft}
+                                onPress={() => router.push('/(tabs)/nearby')}
+                            />
+                            <View style={styles.cardGap} />
+                            <ActionCard
+                                title="Nasıl Giderim"
+                                description="Başlangıç ve varış noktası seçin"
+                                iconName="map-outline"
+                                iconColor={Colors.accent}
+                                iconBg={Colors.accentSoft}
+                                onPress={() => router.push('/(tabs)/directions')}
+                            />
+                            <View style={styles.cardGap} />
+                            <ActionCard
+                                title="Hatlar"
+                                description="Tüm ESHOT hatlarını keşfedin"
+                                iconName="bus-outline"
+                                iconColor={Colors.success}
+                                iconBg={Colors.successSoft}
+                                onPress={() => router.push('/(tabs)/routes')}
+                            />
+                        </ScrollView>
+
+                        <View style={styles.favoritesSection}>
+                            <TabbedList
+                                tabs={['Favori Hatlar', 'Favori Duraklar']}
+                                activeTab={activeTab}
+                                onTabChange={setActiveTab}
+                            >
+                                {activeTab === 0 ? (
+                                    favoriteRoutes.length > 0 ? favoriteRoutes.map((route, index) => (
+                                        <FavoriteListItem
+                                            key={`${route?.id || 'route'}-${index}`}
+                                            variant="route"
+                                            badgeText={route.routeNumber}
+                                            title={route.title}
+                                            subtitle={route.operatingHours}
+                                            onPress={() => router.push(`/route/${route.id}`)}
+                                            hasAnnouncement={route.hasAnnouncement}
+                                        />
+                                    )) : (
+                                        <Text style={styles.emptyText}>Henüz favori hattınız yok.</Text>
+                                    )
+                                ) : (
+                                    favoriteStops.length > 0 ? favoriteStops.map((stop, index) => {
+                                        if (!stop || typeof stop !== 'object') return null;
+                                        return (
+                                            <FavoriteListItem
+                                                key={`${stop?.id || 'stop'}-${index}`}
+                                                variant="stop"
+                                                badgeText="D"
+                                                title={stop.name || 'Bilinmeyen Durak'}
+                                                metaLabel={`Durak ID: ${stop.id || '-'}`}
+                                                subtitle={`Lat: ${Number(stop.latitude || 0).toFixed(2)} - Lon: ${Number(stop.longitude || 0).toFixed(2)}`}
+                                                onPress={() => handlePressStop({ ...stop, distanceMeters: 0 })}
+                                            />
+                                        );
+                                    }) : (
+                                        <Text style={styles.emptyText}>Favori durak yok</Text>
+                                    )
+                                )}
+                            </TabbedList>
+                        </View>
                     </ScrollView>
 
-                    <View style={styles.favoritesSection}>
-                        <TabbedList
-                            tabs={['Favori Hatlar', 'Favori Duraklar']}
-                            activeTab={activeTab}
-                            onTabChange={setActiveTab}
-                        >
-                            {activeTab === 0 ? (
-                                favoriteRoutes.length > 0 ? favoriteRoutes.map((route) => (
-                                    <FavoriteListItem
-                                        key={route.id}
-                                        variant="route"
-                                        badgeText={route.routeNumber}
-                                        title={route.title}
-                                        subtitle={route.operatingHours}
-                                        onPress={() => router.push(`/route/${route.id}`)}
-                                        hasAnnouncement={route.hasAnnouncement}
-                                    />
-                                )) : (
-                                    <Text style={styles.emptyText}>Henüz favori hattınız yok.</Text>
-                                )
-                            ) : (
-                                favoriteStops.length > 0 ? favoriteStops.map((stop) => (
-                                    <FavoriteListItem
-                                        key={stop.id}
-                                        variant="stop"
-                                        badgeText="D"
-                                        title={stop.name}
-                                        metaLabel={`Durak ID: ${stop.id}`}
-                                        subtitle={stop.district}
-                                        onPress={() => handlePressStop({ ...stop, distanceMeters: 0 })}
-                                    />
-                                )) : (
-                                    <Text style={styles.emptyText}>Henüz favori durağınız yok.</Text>
-                                )
-                            )}
-                        </TabbedList>
-                    </View>
-                </ScrollView>
-
-                <StopDetailSheet
-                    stop={selectedStop}
-                    visible={selectedStop !== null}
-                    isFavorite={selectedStop ? isFavoriteStop(selectedStop.id) : false}
-                    onClose={() => setSelectedStop(null)}
-                    onToggleFavorite={() => {
-                        if (selectedStop) {
-                            if (isFavoriteStop(selectedStop.id)) {
-                                removeFavoriteStop(selectedStop.id);
-                            } else {
-                                addFavoriteStop(selectedStop);
-                            }
-                        }
-                    }}
-                />
+                    {/* Arama Motoru Overlay'ı */}
+                    <HomeSearchOverlay
+                        searchQuery={searchQuery}
+                        onClose={() => setSearchQuery('')}
+                        onPressRoute={handlePressRoute}
+                        onPressStop={handlePressStop}
+                        allStops={allStops}
+                    />
+                </View>
             </SafeAreaView>
         </View>
     );
@@ -158,6 +150,10 @@ const styles = StyleSheet.create({
     },
     safeArea: {
         flex: 1,
+    },
+    contentWrapper: {
+        flex: 1,
+        position: 'relative',
     },
     scrollView: {
         flex: 1,

@@ -1,13 +1,13 @@
 import ScreenHeader from '@/components/common/ScreenHeader';
 import StopCard from '@/components/stops/StopCard';
-import StopDetailSheet from '@/components/stops/StopDetailSheet';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
-import { MOCK_STOPS } from '@/data/mockStops';
+import { useStops } from '@/context/StopsContext';
 import { useLocation } from '@/hooks/useLocation';
 import { BusStopWithDistance } from '@/types';
 import { getSortedStopsByDistance } from '@/utils/distance';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -24,15 +24,15 @@ const MAX_NEARBY_STOPS = 15;
 export default function NearbyScreen() {
     const { location, isLoading, error, permissionStatus, requestPermission } = useLocation();
     const { addFavoriteStop, removeFavoriteStop, isFavoriteStop } = useFavorites();
+    const { stops: allStops, isLoadingStops } = useStops();
 
-    const [selectedStop, setSelectedStop] = useState<BusStopWithDistance | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     // Konum bazlı mesafe hesaplaması
     const nearbyStops = useMemo(() => {
-        if (!location) return [];
-        return getSortedStopsByDistance(MOCK_STOPS, location).slice(0, MAX_NEARBY_STOPS);
-    }, [location]);
+        if (!location || isLoadingStops) return [];
+        return getSortedStopsByDistance(allStops, location).slice(0, MAX_NEARBY_STOPS);
+    }, [location, allStops, isLoadingStops]);
 
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
@@ -131,7 +131,7 @@ export default function NearbyScreen() {
                     <StopCard
                         stop={item}
                         isFavorite={isFavoriteStop(item.id)}
-                        onPress={() => setSelectedStop(item)}
+                        onPress={() => router.push(`/stop/${item.id}` as any)}
                         onPressFavorite={() => handleToggleFavorite(item)}
                     />
                 )}
@@ -148,22 +148,9 @@ export default function NearbyScreen() {
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Ionicons name="bus-outline" size={48} color={Colors.gray400} />
-                        <Text style={styles.emptyText}>Yakında durak bulunamadı</Text>
+                        <Text style={styles.emptyText}>Durak bulunamadı</Text>
                     </View>
                 }
-            />
-
-            {/* Durak Detay Bottom Sheet */}
-            <StopDetailSheet
-                stop={selectedStop}
-                visible={selectedStop !== null}
-                isFavorite={selectedStop ? isFavoriteStop(selectedStop.id) : false}
-                onClose={() => setSelectedStop(null)}
-                onToggleFavorite={() => {
-                    if (selectedStop) {
-                        handleToggleFavorite(selectedStop);
-                    }
-                }}
             />
         </View>
     );

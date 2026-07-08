@@ -4,14 +4,11 @@
 
 /** ESHOT durak bilgisi */
 export interface BusStop {
-  /** 5 haneli durak kimliği (ör. 12234) */
-  id: number;
-  /** Durak adı (ör. "Konak İskele") */
+  id: string | number;
   name: string;
   latitude: number;
   longitude: number;
-  district: string;
-  routes: string[];
+  routes: number[];
   isFavorite?: boolean;
 }
 
@@ -25,14 +22,26 @@ export interface BusRoute {
   stops?: number[]; // Hangi duraklardan geçtiği (id listesi)
 }
 
-/** Durağa yaklaşan otobüs */
+/** Durağa yaklaşan otobüs (API Veri Modeli) */
 export interface ApproachingBus {
-  id: string;
-  routeNumber: string;
-  destination: string;
-  estimatedMinutes: number;
+  busId: string | number;
+  routeNumber: string | number;
+  routeName: string;
+  remainingStopCount: number | null;
+  direction: string | number | null;
+  latitude: number | null;
+  longitude: number | null;
   isAccessible: boolean;
-  isLowFloor: boolean;
+  hasBicycleRack: boolean;
+}
+
+/** API Durum Modeli (UI Yönetimi İçin) */
+export interface ApiResponseState<T = any> {
+  isLoading: boolean;
+  isSuccess: boolean;
+  isEmpty: boolean;
+  errorMessage: string | null;
+  data?: T;
 }
 
 /** Kullanıcı konumu */
@@ -51,8 +60,8 @@ export interface FavoritesContextType {
   favoriteStops: BusStop[];
   favoriteRoutes: BusRoute[];
   addFavoriteStop: (stop: BusStop) => Promise<void>;
-  removeFavoriteStop: (stopId: number) => Promise<void>;
-  isFavoriteStop: (stopId: number) => boolean;
+  removeFavoriteStop: (stopId: string | number) => Promise<void>;
+  isFavoriteStop: (stopId: string | number) => boolean;
   addFavoriteRoute: (route: BusRoute) => Promise<void>;
   removeFavoriteRoute: (routeId: string) => Promise<void>;
   isFavoriteRoute: (routeId: string) => boolean;

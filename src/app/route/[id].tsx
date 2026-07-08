@@ -1,6 +1,7 @@
 import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
+import { useStops } from '@/context/StopsContext';
 import { MOCK_ROUTES } from '@/data/mockRoutes';
 import { getStopsForRoute } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,9 +15,10 @@ export default function RouteDetailScreen() {
     const insets = useSafeAreaInsets();
 
     const { isFavoriteRoute, addFavoriteRoute, removeFavoriteRoute } = useFavorites();
+    const { stops: allStops } = useStops();
 
     const route = useMemo(() => MOCK_ROUTES.find((r) => r.id === id), [id]);
-    const stops = useMemo(() => getStopsForRoute(id as string), [id]);
+    const routeStops = useMemo(() => getStopsForRoute(id as string, allStops), [id, allStops]);
 
     if (!route) {
         return (
@@ -82,12 +84,12 @@ export default function RouteDetailScreen() {
 
                 {/* GÜZERGAH */}
                 <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Güzergah ({stops.length} durak)</Text>
+                    <Text style={styles.sectionTitle}>Güzergah ({routeStops.length} durak)</Text>
 
                     <View style={styles.timeline}>
-                        {stops.length > 0 ? stops.map((stop, index) => {
+                        {routeStops.length > 0 ? routeStops.map((stop, index) => {
                             const isFirst = index === 0;
-                            const isLast = index === stops.length - 1;
+                            const isLast = index === routeStops.length - 1;
 
                             return (
                                 <View key={`stop-${stop.id}-${index}`} style={styles.timelineItem}>
@@ -99,7 +101,7 @@ export default function RouteDetailScreen() {
 
                                     <View style={styles.timelineContent}>
                                         <Text style={styles.stopName}>{stop.name}</Text>
-                                        <Text style={styles.stopDistrict}>{stop.district} · ID: {stop.id}</Text>
+                                        <Text style={styles.stopDistrict}>ID: {stop.id}</Text>
                                     </View>
                                 </View>
                             );

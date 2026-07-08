@@ -1,0 +1,576 @@
+[
+  {
+    "id": "10005",
+    "name": "Bahribaba",
+    "latitude": 38.4152683626015,
+    "longitude": 27.1276395272209,
+    "routes": [
+      32
+    ]
+  },
+  {
+    "id": "10007",
+    "name": "Bahribaba",
+    "latitude": 38.415144105211,
+    "longitude": 27.1277200912719,
+    "routes": [
+      29,
+      30
+    ]
+  },
+  {
+    "id": "10008",
+    "name": "Bahribaba",
+    "latitude": 38.4151871958719,
+    "longitude": 27.1275666433932,
+    "routes": [
+      15
+    ]
+  },
+  {
+    "id": "10009",
+    "name": "Bahribaba",
+    "latitude": 38.415056,
+    "longitude": 27.127667,
+    "routes": [
+      587
+    ]
+  },
+  {
+    "id": "10010",
+    "name": "Bahribaba",
+    "latitude": 38.4151,
+    "longitude": 27.1275,
+    "routes": [
+      157
+    ]
+  },
+  {
+    "id": "10011",
+    "name": "Bahribaba",
+    "latitude": 38.415025,
+    "longitude": 27.127564,
+    "routes": [
+      224
+    ]
+  },
+  {
+    "id": "10012",
+    "name": "Bahribaba",
+    "latitude": 38.415174494138,
+    "longitude": 27.1272489250589,
+    "routes": [
+      193
+    ]
+  },
+  {
+    "id": "10013",
+    "name": "Bahribaba",
+    "latitude": 38.415048,
+    "longitude": 27.127411,
+    "routes": [
+      588
+    ]
+  },
+  {
+    "id": "10014",
+    "name": "Bahribaba",
+    "latitude": 38.41497,
+    "longitude": 27.127469,
+    "routes": [
+      550
+    ]
+  },
+  {
+    "id": "10015",
+    "name": "Bahribaba",
+    "latitude": 38.4149,
+    "longitude": 27.1273,
+    "routes": [
+      33
+    ]
+  },
+  {
+    "id": "10016",
+    "name": "Bahribaba",
+    "latitude": 38.4148,
+    "longitude": 27.1276,
+    "routes": [
+      21,
+      910,
+      920,
+      930,
+      940,
+      950
+    ]
+  },
+  {
+    "id": "10019",
+    "name": "Bahribaba",
+    "latitude": 38.4154695809215,
+    "longitude": 27.1270495656879,
+    "routes": [
+      121,
+      253,
+      811
+    ]
+  },
+  {
+    "id": "10021",
+    "name": "Bahribaba",
+    "latitude": 38.4156035734003,
+    "longitude": 27.1270134583032,
+    "routes": [
+      35,
+      951
+    ]
+  },
+  {
+    "id": "10022",
+    "name": "Bahribaba",
+    "latitude": 38.4154863086942,
+    "longitude": 27.1267884624464,
+    "routes": [
+      302
+    ]
+  },
+  {
+    "id": "10030",
+    "name": "Konak",
+    "latitude": 38.4162181137466,
+    "longitude": 27.1263209374252,
+    "routes": [
+      303,
+      304
+    ]
+  },
+  {
+    "id": "10033",
+    "name": "Çileme Mezarlığı",
+    "latitude": 38.1418733899347,
+    "longitude": 27.1880985580459,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10034",
+    "name": "Çileme Mezarlığı",
+    "latitude": 38.1416473875796,
+    "longitude": 27.1883185562836,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10036",
+    "name": "Konak",
+    "latitude": 38.416466,
+    "longitude": 27.127236,
+    "routes": [
+      104,
+      171,
+      465,
+      471
+    ]
+  },
+  {
+    "id": "10037",
+    "name": "Konak",
+    "latitude": 38.416633,
+    "longitude": 27.126987,
+    "routes": [
+      484,
+      485
+    ]
+  },
+  {
+    "id": "10038",
+    "name": "Konak",
+    "latitude": 38.415688,
+    "longitude": 27.126432,
+    "routes": [
+      152,
+      887
+    ]
+  },
+  {
+    "id": "10039",
+    "name": "Konak",
+    "latitude": 38.415883,
+    "longitude": 27.126331,
+    "routes": [
+      508
+    ]
+  },
+  {
+    "id": "10040",
+    "name": "Konak",
+    "latitude": 38.416022,
+    "longitude": 27.126181,
+    "routes": [
+      284,
+      417,
+      466
+    ]
+  },
+  {
+    "id": "10041",
+    "name": "Konak",
+    "latitude": 38.416121,
+    "longitude": 27.126002,
+    "routes": [
+      233
+    ]
+  },
+  {
+    "id": "10056",
+    "name": "Fatih",
+    "latitude": 38.1402342164442,
+    "longitude": 27.196591496071,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10057",
+    "name": "Fatih",
+    "latitude": 38.1398063442101,
+    "longitude": 27.1960785538632,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10058",
+    "name": "Karakuyu Yolu",
+    "latitude": 38.146886,
+    "longitude": 27.184758,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10059",
+    "name": "Karakuyu Yolu",
+    "latitude": 38.146728,
+    "longitude": 27.184888,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10083",
+    "name": "Çileme Tepe Sokak",
+    "latitude": 38.147828,
+    "longitude": 27.181829,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10084",
+    "name": "Çileme Tepe Sokak",
+    "latitude": 38.14792,
+    "longitude": 27.181749,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10085",
+    "name": "Çileme Yolu",
+    "latitude": 38.1308,
+    "longitude": 27.234432,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10086",
+    "name": "Çileme Yolu",
+    "latitude": 38.13083,
+    "longitude": 27.23435,
+    "routes": [
+      792
+    ]
+  },
+  {
+    "id": "10102",
+    "name": "İskele",
+    "latitude": 38.4199,
+    "longitude": 27.1279,
+    "routes": [
+      35,
+      36,
+      121,
+      202,
+      253,
+      302,
+      466,
+      838,
+      910,
+      920,
+      930,
+      940,
+      950,
+      951
+    ]
+  },
+  {
+    "id": "10103",
+    "name": "Belediye Sarayı",
+    "latitude": 38.4214,
+    "longitude": 27.1297,
+    "routes": [
+      18,
+      19,
+      20,
+      27,
+      36,
+      121,
+      202,
+      253,
+      302,
+      466,
+      811,
+      838,
+      910,
+      920,
+      930,
+      940,
+      950
+    ]
+  },
+  {
+    "id": "10104",
+    "name": "Sosyal Sigortalar Kurumu",
+    "latitude": 38.4252,
+    "longitude": 27.1324,
+    "routes": [
+      121,
+      202,
+      253,
+      910,
+      920,
+      940,
+      950
+    ]
+  },
+  {
+    "id": "10106",
+    "name": "Dokuz Eylül Rektörlük",
+    "latitude": 38.4305,
+    "longitude": 27.1359,
+    "routes": [
+      121,
+      202,
+      253,
+      910,
+      920,
+      940,
+      950
+    ]
+  },
+  {
+    "id": "10107",
+    "name": "Dokuz Eylül Rektörlük",
+    "latitude": 38.4319,
+    "longitude": 27.1375,
+    "routes": [
+      121,
+      253,
+      920
+    ]
+  },
+  {
+    "id": "10108",
+    "name": "Alsancak Devlet Hastanesi",
+    "latitude": 38.4343926068025,
+    "longitude": 27.1417883261712,
+    "routes": [
+      121,
+      253,
+      920
+    ]
+  },
+  {
+    "id": "10109",
+    "name": "Alsancak Devlet Hastanesi",
+    "latitude": 38.4344011194949,
+    "longitude": 27.1422907678495,
+    "routes": [
+      121,
+      253,
+      920
+    ]
+  },
+  {
+    "id": "10110",
+    "name": "Talatpaşa",
+    "latitude": 38.4355826148228,
+    "longitude": 27.144567309316,
+    "routes": [
+      121,
+      253,
+      920
+    ]
+  },
+  {
+    "id": "10111",
+    "name": "Talatpaşa",
+    "latitude": 38.4353,
+    "longitude": 27.1442,
+    "routes": [
+      121,
+      253,
+      920
+    ]
+  },
+  {
+    "id": "10112",
+    "name": "Halit Ziya",
+    "latitude": 38.4261022304167,
+    "longitude": 27.1350187376018,
+    "routes": [
+      121,
+      202,
+      253,
+      910,
+      920,
+      940,
+      950
+    ]
+  },
+  {
+    "id": "10117",
+    "name": "Hisarönü",
+    "latitude": 38.4224,
+    "longitude": 27.1323,
+    "routes": [
+      23,
+      35,
+      811,
+      930,
+      940,
+      951
+    ]
+  },
+  {
+    "id": "10119",
+    "name": "Kavaflar",
+    "latitude": 38.4224,
+    "longitude": 27.1365,
+    "routes": [
+      35,
+      72,
+      104,
+      105,
+      171,
+      285,
+      374,
+      465,
+      471,
+      484,
+      485,
+      811
+    ]
+  },
+  {
+    "id": "10121",
+    "name": "Çankaya",
+    "latitude": 38.42242,
+    "longitude": 27.13935,
+    "routes": [
+      41,
+      42,
+      44,
+      45,
+      46,
+      234,
+      302,
+      811,
+      951
+    ]
+  },
+  {
+    "id": "10123",
+    "name": "Basmane Ptt",
+    "latitude": 38.4224005849569,
+    "longitude": 27.1415003678137,
+    "routes": [
+      34,
+      35,
+      36,
+      39,
+      466,
+      811,
+      838
+    ]
+  },
+  {
+    "id": "10124",
+    "name": "Çardak 2",
+    "latitude": 38.4239945470502,
+    "longitude": 27.1388195260945,
+    "routes": [
+      34,
+      39,
+      41,
+      42,
+      44,
+      45,
+      46,
+      234
+    ]
+  },
+  {
+    "id": "10126",
+    "name": "Borsa",
+    "latitude": 38.4245,
+    "longitude": 27.1346,
+    "routes": [
+      35,
+      36,
+      302,
+      466,
+      838,
+      930,
+      951
+    ]
+  },
+  {
+    "id": "10128",
+    "name": "Çardak",
+    "latitude": 38.424081,
+    "longitude": 27.140708,
+    "routes": [
+      35,
+      36,
+      302,
+      466,
+      811,
+      838,
+      951
+    ]
+  },
+  {
+    "id": "10130",
+    "name": "Şehit Fethibey",
+    "latitude": 38.4228272009637,
+    "longitude": 27.1320369028685,
+    "routes": [
+      41,
+      42
+    ]
+  },
+  {
+    "id": "10131",
+    "name": "Şehit Fethibey",
+    "latitude": 38.4233164939576,
+    "longitude": 27.1322943160597,
+    "routes": [
+      46
+    ]
+  }
+]

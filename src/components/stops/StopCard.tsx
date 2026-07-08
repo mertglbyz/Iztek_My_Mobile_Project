@@ -23,7 +23,6 @@ export default function StopCard({ stop, isFavorite, onPress, onPressFavorite }:
             {/* Orta: Durak bilgileri */}
             <View style={styles.infoContainer}>
                 <Text style={styles.stopName} numberOfLines={1}>{stop.name}</Text>
-                <Text style={styles.district}>{stop.district}</Text>
                 <View style={styles.routesRow}>
                     {stop.routes.slice(0, 4).map((route) => (
                         <View key={route} style={styles.routeBadge}>

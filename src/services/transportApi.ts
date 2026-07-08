@@ -2,44 +2,130 @@
 
 /**
  * ESHOT Ulaşım Servis Katmanı
- * Bu dosya, uygulamanın dış veri kaynaklarıyla (CSV ve API) olan iletişimini tek bir merkezden yönetir.
+ * Uygulamanın dış kaynaklarla (API ve JSON) olan bağlantısını güvence altında tutar.
  */
 
-// Not: İlerleyen günlerde CSV parse işlemleri ve API çağrıları için axios/fetch veya papaparse 
-// gibi kütüphaneler buraya import edilecektir.
+import stopsJson from '@/data/stops.json';
+import { ApproachingBus, BusStop } from '@/types';
+
+// ============================
+// HELPER FONKSİYONLAR
+// ============================
+
+export const parseCoordinate = (value: any): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseFloat(String(value).replace(',', '.'));
+  return isNaN(parsed) ? null : parsed;
+};
+
+export const parseRoutes = (value: any): number[] => {
+  if (Array.isArray(value)) {
+    return value.map(Number).filter(n => !isNaN(n));
+  }
+  if (typeof value === 'string') {
+    return value.split('-').map(Number).filter(n => !isNaN(n));
+  }
+  return [];
+};
+
+export const normalizeStop = (rawStop: any): BusStop => {
+  return {
+    id: rawStop.id ? String(rawStop.id) : String(Math.random()),
+    name: rawStop.name || 'Bilinmiyor',
+    latitude: parseCoordinate(rawStop.latitude) || 0,
+    longitude: parseCoordinate(rawStop.longitude) || 0,
+    routes: parseRoutes(rawStop.routes)
+  };
+};
+
+export const normalizeApproachingBus = (rawBus: any): ApproachingBus => {
+  return {
+    busId: rawBus.OtobusId ? String(rawBus.OtobusId) : '0',
+    routeNumber: rawBus.HatNumarasi ? String(rawBus.HatNumarasi) : '?',
+    routeName: rawBus.HatAdi ? String(rawBus.HatAdi) : 'Bilinmeyen Hat',
+    remainingStopCount: rawBus.KalanDurakSayisi !== null && rawBus.KalanDurakSayisi !== undefined ? Number(rawBus.KalanDurakSayisi) : null,
+    direction: rawBus.HattinYonu !== null && rawBus.HattinYonu !== undefined ? String(rawBus.HattinYonu) : null,
+    latitude: parseCoordinate(rawBus.KoorX),
+    longitude: parseCoordinate(rawBus.KoorY),
+    isAccessible: Boolean(rawBus.EngelliMi),
+    hasBicycleRack: Boolean(rawBus.BisikletAparatliMi)
+  };
+};
+
+// ============================
+// ANA SERVİS METOTLARI
+// ============================
+
+let cachedStops: BusStop[] | null = null;
 
 /**
- * CSV dosyasından tüm durak listesini okur ve döner.
- * @returns {Promise<Stop[]>} Uygulama formatına dönüştürülmüş durak modelleri dizisi.
+ * 50 kayıtlık JSON'dan tüm durakları çeker ve normalize eder.
  */
-export const getStops = async () => {
-  // TODO: CSV dosyası okunacak ve parse edilecek.
-  // DİKKAT: 80 adet durağın DURAKTAN_GECEN_HATLAR alanı boş (null/undefined). 
-  // Uygulamanın çökmemesi (crash) için parse işlemi sırasında güvenlik kontrolü yapılmalı:
-  // routes: rawRoutes ? rawRoutes.split('-').map(Number) : []
-  // Örn: return parsedStops;
+export const getStops = async (): Promise<BusStop[]> => {
+  if (cachedStops) return cachedStops;
+
+  try {
+    const rawStops = stopsJson as any[];
+
+    const validStops = rawStops
+      .map(normalizeStop)
+      .filter(s => s.latitude !== 0 && s.longitude !== 0 && s.id);
+
+    cachedStops = validStops;
+    return validStops;
+  } catch (error) {
+    console.error("Duraklar yüklenirken hata oluştu:", error);
+    return [];
+  }
 };
 
 /**
- * Belirli bir durak ID'si için durağa yaklaşan otobüsleri API'den çeker.
- * @param {string} stopId - Yaklaşan araçları sorgulanacak durağın tekil ID'si.
- * @returns {Promise<ApproachingBus[]>} API'den gelen verinin ApproachingBus modeline dönüştürülmüş hali.
+ * Durak arama metodu (Ad, ID veya Geçen Hatta Göre)
  */
-export const getApproachingBuses = async (stopId: string) => {
-  // TODO: https://openapi.izmir.bel.tr/api/iztek/duragayaklasanotobusler/{stopId} adresine GET isteği atılacak.
-  // DİKKAT: API'den gelen KoorX ve KoorY değerleri virgüllü string. 
-  // Harita bileşeni için float (number) tipe çevrilirken virgül noktaya dönüştürülmeli:
-  // latitude: parseFloat(koorX.replace(',', '.'))
-  // longitude: parseFloat(koorY.replace(',', '.'))
-  // Örn: return parsedBuses;
+export const searchStops = async (query: string): Promise<BusStop[]> => {
+  const stops = await getStops();
+  const q = query.toLocaleLowerCase('tr-TR').trim();
+  if (!q) return [];
+
+  return stops.filter(s => {
+    if (s.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
+    if (String(s.id).includes(q)) return true;
+
+    const qNum = Number(q);
+    if (!isNaN(qNum) && s.routes.includes(qNum)) return true;
+
+    return false;
+  });
 };
 
 /**
- * Belirli bir hatta aktif olarak çalışan tüm otobüslerin anlık konumlarını API'den çeker.
- * @param {string} routeNumber - Sorgulanacak hattın numarası (Örn: "277").
- * @returns {Promise<any[]>} Hatta ait araçların anlık konum bilgileri.
+ * ID ile durak bulma
  */
-export const getRouteVehicles = async (routeNumber: string) => {
-  // TODO: https://openapi.izmir.bel.tr/api/iztek/hatotobuskonumlari/{routeNumber} adresine GET isteği atılacak.
-  // Örn: return routeVehicles;
+export const getStopById = async (stopId: string | number): Promise<BusStop | undefined> => {
+  const stops = await getStops();
+  return stops.find(s => String(s.id) === String(stopId));
+};
+
+/**
+ * Yaklaşan otobüsleri API'den çeker ve temiz modele dönüştürür.
+ */
+export const getApproachingBuses = async (stopId: string | number): Promise<ApproachingBus[]> => {
+  try {
+    const response = await fetch(`https://openapi.izmir.bel.tr/api/iztek/duragayaklasanotobusler/${stopId}`);
+
+    if (!response.ok) {
+      throw new Error(`API Hatası: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      return [];
+    }
+
+    return data.map(normalizeApproachingBus);
+  } catch (error) {
+    console.error(`Durak ${stopId} için araçlar getirilirken hata:`, error);
+    throw error;
+  }
 };

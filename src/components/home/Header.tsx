@@ -2,9 +2,7 @@ import { Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-interface HeaderProps {
-    userName?: string;
-}
+interface HeaderProps { }
 
 function getGreeting(): string {
     const hour = new Date().getHours();
@@ -13,21 +11,17 @@ function getGreeting(): string {
     return 'İyi akşamlar';
 }
 
-export default function Header({ userName = 'Yolcu' }: HeaderProps) {
+export default function Header({ }: HeaderProps) {
     return (
         <View style={styles.container}>
             <View style={styles.content}>
                 <View style={styles.textContainer}>
-                    <Text style={styles.greeting}>{getGreeting()}</Text>
-                    <Text style={styles.userName}>{userName}</Text>
+                    <Text style={styles.userName}>{getGreeting()}</Text>
                     <Text style={styles.subtitle}>İzmir ulaşımına hoş geldiniz</Text>
                 </View>
                 <View style={styles.actions}>
                     <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
                         <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-                        <Ionicons name="person-circle-outline" size={26} color={Colors.primary} />
                     </TouchableOpacity>
                 </View>
             </View>

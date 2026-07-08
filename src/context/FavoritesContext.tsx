@@ -24,8 +24,14 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
                 AsyncStorage.getItem(FAVORITES_ROUTES_KEY)
             ]);
 
-            if (storedStops) setFavoriteStops(JSON.parse(storedStops));
-            if (storedRoutes) setFavoriteRoutes(JSON.parse(storedRoutes));
+            if (storedStops) {
+                const parsedStops = JSON.parse(storedStops);
+                setFavoriteStops(Array.isArray(parsedStops) ? parsedStops : []);
+            }
+            if (storedRoutes) {
+                const parsedRoutes = JSON.parse(storedRoutes);
+                setFavoriteRoutes(Array.isArray(parsedRoutes) ? parsedRoutes : []);
+            }
         } catch (error) {
             console.error('Favoriler yüklenemedi:', error);
         } finally {
@@ -52,7 +58,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     // ----- DURAKLAR İÇİN -----
     const addFavoriteStop = useCallback(async (stop: BusStop) => {
         setFavoriteStops((prev) => {
-            const alreadyExists = prev.some((s) => s.id === stop.id);
+            const alreadyExists = prev.some((s) => String(s.id) === String(stop.id));
             if (alreadyExists) return prev;
             const updated = [...prev, { ...stop, isFavorite: true }];
             saveFavoriteStops(updated);
@@ -60,16 +66,16 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         });
     }, []);
 
-    const removeFavoriteStop = useCallback(async (stopId: number) => {
+    const removeFavoriteStop = useCallback(async (stopId: string | number) => {
         setFavoriteStops((prev) => {
-            const updated = prev.filter((s) => s.id !== stopId);
+            const updated = prev.filter((s) => String(s.id) !== String(stopId));
             saveFavoriteStops(updated);
             return updated;
         });
     }, []);
 
     const isFavoriteStop = useCallback(
-        (stopId: number) => favoriteStops.some((s) => s.id === stopId),
+        (stopId: string | number) => favoriteStops.some((s) => String(s.id) === String(stopId)),
         [favoriteStops]
     );
 

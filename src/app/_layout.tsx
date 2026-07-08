@@ -1,4 +1,5 @@
 import { FavoritesProvider } from '@/context/FavoritesContext';
+import { StopsProvider } from '@/context/StopsContext';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -11,8 +12,10 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <FavoritesProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </FavoritesProvider>
+    <StopsProvider>
+      <FavoritesProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </FavoritesProvider>
+    </StopsProvider>
   );
 }
