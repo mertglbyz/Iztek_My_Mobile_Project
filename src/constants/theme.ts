@@ -76,13 +76,13 @@ export const BorderRadius = {
 } as const;
 
 export const FontSizes = {
-  xs: 11,
-  sm: 13,
-  base: 15,
-  md: 17,
-  lg: 20,
-  xl: 24,
-  xxl: 30,
+  xs: 12,
+  sm: 15,
+  base: 17,
+  md: 19,
+  lg: 22,
+  xl: 26,
+  xxl: 32,
 } as const;
 
 export const FontWeights = {
