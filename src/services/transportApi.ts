@@ -52,6 +52,21 @@ export const normalizeApproachingBus = (rawBus: any): ApproachingBus => {
   };
 };
 
+/** Hat Lokasyon API'sinden gelen farklı field yapıları için özel dönüştürücü */
+export const normalizeRouteVehicle = (rawVehicle: any): ApproachingBus => {
+  return {
+    busId: rawVehicle.OtobusId ? String(rawVehicle.OtobusId) : '0',
+    routeNumber: rawVehicle.HatNumarasi ? String(rawVehicle.HatNumarasi) : '?',
+    routeName: '', // Konum API'sinden ad dönmeyebiliyor
+    remainingStopCount: null, // Duraksal bir tahmin yok, sadece GPS var
+    direction: rawVehicle.Yon !== undefined ? String(rawVehicle.Yon) : null,
+    latitude: parseCoordinate(rawVehicle.KoorX),
+    longitude: parseCoordinate(rawVehicle.KoorY),
+    isAccessible: false,
+    hasBicycleRack: false
+  };
+};
+
 // ============================
 // ANA SERVİS METOTLARI
 // ============================
@@ -126,6 +141,44 @@ export const getApproachingBuses = async (stopId: string | number): Promise<Appr
     return data.map(normalizeApproachingBus);
   } catch (error) {
     console.error(`Durak ${stopId} için araçlar getirilirken hata:`, error);
+    throw error;
+  }
+};
+
+/**
+ * 4. MADDE: Hat numarasına göre canlı araç konumlarını getir.
+ * ESHOT API'sindeki Ping-Trail (Tekrarlayan Otobüs ID) hatasını Deduplication ile engeller.
+ */
+export const getRouteVehicles = async (routeNumber: string | number): Promise<ApproachingBus[]> => {
+  try {
+    const response = await fetch(`https://openapi.izmir.bel.tr/api/iztek/hatotobuskonumlari/${routeNumber}`);
+
+    if (!response.ok) {
+      throw new Error(`Route API Hatası: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.HataVarMi || !Array.isArray(data.HatOtobusKonumlari)) {
+      return [];
+    }
+
+    const uniqueVehiclesMap = new Map<string, ApproachingBus>();
+
+    data.HatOtobusKonumlari.forEach((rawItem: any) => {
+      // HatNumarasi API formatında bazen dönmeyebiliyor, routeNumber takviyesi yapıldı
+      const vehicle = normalizeRouteVehicle({ ...rawItem, HatNumarasi: routeNumber });
+
+      // Geçerli koordinatı yoksa dikkate alma (Null Koruma)
+      if (vehicle.latitude === null || vehicle.longitude === null || vehicle.latitude === 0) return;
+
+      // Map "set" metodu, aynı busId'ye sahip olan verilerin sonuncusunu ezip geçer. Duplicate önlenir.
+      uniqueVehiclesMap.set(String(vehicle.busId), vehicle);
+    });
+
+    return Array.from(uniqueVehiclesMap.values());
+  } catch (error) {
+    console.error(`Hat ${routeNumber} için aktif araçlar yüklenemedi:`, error);
     throw error;
   }
 };

@@ -1,31 +1,71 @@
 import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
-import { useFavorites } from '@/context/FavoritesContext';
 import { useStops } from '@/context/StopsContext';
-import { MOCK_ROUTES } from '@/data/mockRoutes';
+import { getRouteVehicles } from '@/services/transportApi';
+import { ApiResponseState, ApproachingBus } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RouteDetailScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id } = useLocalSearchParams<{ id: string }>(); // Tıklanan Hat Numarası
     const insets = useSafeAreaInsets();
-
-    const { isFavoriteRoute, addFavoriteRoute, removeFavoriteRoute } = useFavorites();
     const { stops: allStops } = useStops();
 
-    const route = useMemo(() => MOCK_ROUTES.find((r) => r.id === id), [id]);
-    const routeStops = useMemo(() => getStopsForRoute(id as string, allStops), [id, allStops]);
+    // Mock sistemi kaldırıldığı için dinamik olarak bu hattan geçen durakları bul
+    const routeStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
 
-    if (!route) {
+    // Canlı Araçlar State Yönetimi
+    const [vehiclesState, setVehiclesState] = useState<ApiResponseState<ApproachingBus[]>>({
+        isLoading: true,
+        isSuccess: false,
+        isEmpty: false,
+        errorMessage: null,
+        data: []
+    });
+
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+    const fetchVehicles = useCallback(async () => {
+        setVehiclesState(prev => ({ ...prev, isLoading: true, errorMessage: null }));
+        try {
+            const data = await getRouteVehicles(id);
+            setVehiclesState({
+                isLoading: false,
+                isSuccess: true,
+                isEmpty: data.length === 0,
+                errorMessage: null,
+                data
+            });
+            setLastUpdated(new Date());
+        } catch (error) {
+            setVehiclesState({
+                isLoading: false,
+                isSuccess: false,
+                isEmpty: false,
+                errorMessage: 'Araç konumları alınamadı. Lütfen tekrar deneyin.',
+                data: []
+            });
+        }
+    }, [id]);
+
+    // Ekrana ilk girişte ve 30 saniyede bir araçları güncelle
+    useEffect(() => {
+        fetchVehicles();
+        const interval = setInterval(fetchVehicles, 30000);
+        return () => clearInterval(interval);
+    }, [fetchVehicles]);
+
+    // Eğer bu numaradan geçen hiçbir durak yoksa (veya geçersiz input ise) Hata Ekranı
+    if (routeStops.length === 0) {
         return (
             <View style={[styles.container, styles.centered]}>
                 <FocusStatusBar style="dark" />
                 <Ionicons name="warning-outline" size={48} color={Colors.error} />
-                <Text style={styles.errorText}>Hat bulunamadı</Text>
+                <Text style={styles.errorText}>Hat bulunamadı veya durak bilgisi yok</Text>
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                     <Text style={styles.backButtonText}>Geri Dön</Text>
                 </TouchableOpacity>
@@ -33,14 +73,8 @@ export default function RouteDetailScreen() {
         );
     }
 
-    const isFavorite = isFavoriteRoute(route.id);
-
     const handleToggleFavorite = () => {
-        if (isFavorite) {
-            removeFavoriteRoute(route.id);
-        } else {
-            addFavoriteRoute(route);
-        }
+        Alert.alert("Yakında", "Hat favorileme sistemi gerçek sunucuya geçişte aktif edilecektir.");
     };
 
     return (
@@ -54,45 +88,104 @@ export default function RouteDetailScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerRouteNumber}>{route.routeNumber}</Text>
+                    <Text style={styles.headerRouteNumber}>{id}</Text>
                 </View>
 
                 <TouchableOpacity onPress={handleToggleFavorite} style={styles.iconButton}>
-                    <Ionicons
-                        name={isFavorite ? 'star' : 'star-outline'}
-                        size={24}
-                        color={isFavorite ? Colors.accent : Colors.white}
-                    />
+                    <Ionicons name="star-outline" size={24} color={Colors.white} />
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
                 {/* HAT BİLGİSİ */}
                 <View style={styles.infoCard}>
-                    <Text style={styles.routeTitle}>{route.title}</Text>
+                    <Text style={styles.routeTitle}>Hat {id}</Text>
                     <View style={styles.timeRow}>
-                        <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
-                        <Text style={styles.timeText}>Çalışma Saatleri: {route.operatingHours}</Text>
+                        <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
+                        <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
                     </View>
-                    {route.hasAnnouncement && (
-                        <View style={styles.announcementRow}>
-                            <Ionicons name="warning" size={16} color={Colors.warning} />
-                            <Text style={styles.announcementText}>Bu hatla ilgili duyuru bulunmaktadır.</Text>
+                </View>
+
+                {/* AKTİF ARAÇLAR */}
+                <View style={styles.sectionContainer}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Aktif Araçlar</Text>
+                        <TouchableOpacity
+                            onPress={fetchVehicles}
+                            disabled={vehiclesState.isLoading}
+                            style={styles.refreshButton}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={18}
+                                color={vehiclesState.isLoading ? Colors.gray400 : Colors.primary}
+                            />
+                            <Text style={[
+                                styles.refreshText,
+                                vehiclesState.isLoading && { color: Colors.gray400 }
+                            ]}>
+                                {vehiclesState.isLoading ? 'Yükleniyor...' : 'Yenile'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {lastUpdated && (
+                        <Text style={styles.lastUpdateText}>
+                            Son güncelleme: {lastUpdated.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </Text>
+                    )}
+
+                    {vehiclesState.isLoading && !vehiclesState.data?.length ? (
+                        <View style={styles.stateCard}>
+                            <Ionicons name="bus-outline" size={32} color={Colors.gray400} />
+                            <Text style={styles.stateText}>Araç konumları aranıyor...</Text>
+                        </View>
+                    ) : vehiclesState.errorMessage ? (
+                        <View style={[styles.stateCard, { borderColor: Colors.error }]}>
+                            <Ionicons name="warning-outline" size={32} color={Colors.error} />
+                            <Text style={[styles.stateText, { color: Colors.error }]}>{vehiclesState.errorMessage}</Text>
+                        </View>
+                    ) : vehiclesState.isEmpty ? (
+                        <View style={styles.stateCard}>
+                            <Ionicons name="moon-outline" size={32} color={Colors.gray400} />
+                            <Text style={styles.stateText}>Şu an hatta aktif araç bulunmuyor.</Text>
+                        </View>
+                    ) : (
+                        <View style={styles.vehiclesList}>
+                            {vehiclesState.data?.map((bus, idx) => (
+                                <View key={`bus-${bus.busId}-${idx}`} style={styles.vehicleCard}>
+                                    <View style={styles.vehicleIconBox}>
+                                        <Ionicons name="bus" size={20} color={Colors.white} />
+                                    </View>
+                                    <View style={styles.vehicleInfo}>
+                                        <Text style={styles.vehicleId}>Araç No: {bus.busId}</Text>
+                                        <Text style={styles.vehicleLocation}>GPS: {bus.latitude?.toFixed(4)}, {bus.longitude?.toFixed(4)}</Text>
+                                    </View>
+                                    <View style={styles.liveBadge}>
+                                        <View style={styles.liveDot} />
+                                        <Text style={styles.liveText}>Canlı</Text>
+                                    </View>
+                                </View>
+                            ))}
                         </View>
                     )}
                 </View>
 
                 {/* GÜZERGAH */}
                 <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Güzergah ({routeStops.length} durak)</Text>
+                    <Text style={styles.sectionTitle}>Hat Güzergahı</Text>
 
                     <View style={styles.timeline}>
-                        {routeStops.length > 0 ? routeStops.map((stop, index) => {
+                        {routeStops.map((stop, index) => {
                             const isFirst = index === 0;
                             const isLast = index === routeStops.length - 1;
 
                             return (
-                                <View key={`stop-${stop.id}-${index}`} style={styles.timelineItem}>
+                                <TouchableOpacity
+                                    key={`route-stop-${stop.id}-${index}`}
+                                    style={styles.timelineItem}
+                                    onPress={() => router.push(`/stop/${stop.id}`)}
+                                >
                                     <View style={styles.timelineGraphic}>
                                         {!isFirst && <View style={styles.timelineLineTop} />}
                                         <View style={[styles.timelineDot, (isFirst || isLast) && styles.timelineDotActive]} />
@@ -103,11 +196,13 @@ export default function RouteDetailScreen() {
                                         <Text style={styles.stopName}>{stop.name}</Text>
                                         <Text style={styles.stopDistrict}>ID: {stop.id}</Text>
                                     </View>
-                                </View>
+
+                                    <View style={styles.chevronBox}>
+                                        <Ionicons name="chevron-forward" size={16} color={Colors.gray200} />
+                                    </View>
+                                </TouchableOpacity>
                             );
-                        }) : (
-                            <Text style={styles.emptyStopsText}>Güzergah bilgisi henüz eklenmemiş.</Text>
-                        )}
+                        })}
                     </View>
                 </View>
             </ScrollView>
@@ -191,20 +286,6 @@ const styles = StyleSheet.create({
         fontSize: FontSizes.sm,
         color: Colors.textSecondary,
     },
-    announcementRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.xs,
-        marginTop: Spacing.md,
-        backgroundColor: Colors.warningSoft,
-        padding: Spacing.sm,
-        borderRadius: BorderRadius.md,
-    },
-    announcementText: {
-        fontSize: FontSizes.xs,
-        color: Colors.warning,
-        fontWeight: FontWeights.medium,
-    },
     sectionContainer: {
         paddingHorizontal: Spacing.base,
         paddingBottom: Spacing.xxxl,
@@ -213,8 +294,107 @@ const styles = StyleSheet.create({
         fontSize: FontSizes.md,
         fontWeight: FontWeights.bold,
         color: Colors.textPrimary,
-        marginBottom: Spacing.md,
     },
+    // ---- YENİ EKLENEN AKTİF ARAÇLAR STİLLERİ ----
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: Spacing.xs,
+    },
+    refreshButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: Spacing.xs,
+        paddingHorizontal: Spacing.sm,
+        backgroundColor: Colors.primarySoft,
+        borderRadius: BorderRadius.full,
+        gap: 4,
+    },
+    refreshText: {
+        fontSize: FontSizes.xs,
+        fontWeight: FontWeights.bold,
+        color: Colors.primary,
+    },
+    lastUpdateText: {
+        fontSize: FontSizes.xs,
+        color: Colors.textDisabled,
+        marginBottom: Spacing.sm,
+        textAlign: 'right',
+    },
+    stateCard: {
+        backgroundColor: Colors.white,
+        padding: Spacing.xl,
+        borderRadius: BorderRadius.xl,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.sm,
+        marginBottom: Spacing.base,
+    },
+    stateText: {
+        fontSize: FontSizes.sm,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+    },
+    vehiclesList: {
+        gap: Spacing.sm,
+        marginBottom: Spacing.base,
+    },
+    vehicleCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+        padding: Spacing.md,
+        borderRadius: BorderRadius.xl,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        ...Shadows.sm,
+    },
+    vehicleIconBox: {
+        width: 40,
+        height: 40,
+        borderRadius: BorderRadius.md,
+        backgroundColor: Colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: Spacing.md,
+    },
+    vehicleInfo: {
+        flex: 1,
+    },
+    vehicleId: {
+        fontSize: FontSizes.sm,
+        fontWeight: FontWeights.bold,
+        color: Colors.textPrimary,
+    },
+    vehicleLocation: {
+        fontSize: FontSizes.xs,
+        color: Colors.textSecondary,
+        marginTop: 2,
+    },
+    liveBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: 4,
+        borderRadius: BorderRadius.full,
+        gap: 4,
+    },
+    liveDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#EF4444',
+    },
+    liveText: {
+        fontSize: FontSizes.xs,
+        fontWeight: FontWeights.bold,
+        color: '#EF4444',
+    },
+    // ---- TİMELİNE STİLLERİ ----
     timeline: {
         backgroundColor: Colors.white,
         borderRadius: BorderRadius.xl,
@@ -226,11 +406,13 @@ const styles = StyleSheet.create({
     timelineItem: {
         flexDirection: 'row',
         minHeight: 56,
+        alignItems: 'center',
     },
     timelineGraphic: {
         width: 24,
         alignItems: 'center',
         marginRight: Spacing.md,
+        height: '100%',
     },
     timelineLineTop: {
         position: 'absolute',
@@ -251,7 +433,9 @@ const styles = StyleSheet.create({
         height: 10,
         borderRadius: 5,
         backgroundColor: Colors.gray400,
-        marginTop: 22,
+        position: 'absolute',
+        top: '50%',
+        marginTop: -5,
         zIndex: 1,
     },
     timelineDotActive: {
@@ -259,13 +443,14 @@ const styles = StyleSheet.create({
         width: 12,
         height: 12,
         borderRadius: 6,
-        marginTop: 21,
+        marginTop: -6,
     },
     timelineContent: {
         flex: 1,
         paddingVertical: Spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: Colors.gray100,
+        justifyContent: 'center',
     },
     stopName: {
         fontSize: FontSizes.sm,
@@ -277,10 +462,8 @@ const styles = StyleSheet.create({
         fontSize: FontSizes.xs,
         color: Colors.textSecondary,
     },
-    emptyStopsText: {
-        fontSize: FontSizes.sm,
-        color: Colors.textSecondary,
-        textAlign: 'center',
-        padding: Spacing.base,
-    },
+    chevronBox: {
+        paddingLeft: Spacing.sm,
+        justifyContent: 'center',
+    }
 });

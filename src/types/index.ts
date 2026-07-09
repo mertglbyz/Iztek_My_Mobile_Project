@@ -22,6 +22,12 @@ export interface BusRoute {
   stops?: number[]; // Hangi duraklardan geçtiği (id listesi)
 }
 
+/** 9 Temmuz Görev Listesi: Hatlar Modülü */
+export type BusRouteSummary = {
+  routeNumber: number;
+  stopCount: number;
+};
+
 /** Durağa yaklaşan otobüs (API Veri Modeli) */
 export interface ApproachingBus {
   busId: string | number;

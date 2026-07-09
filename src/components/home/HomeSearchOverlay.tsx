@@ -1,6 +1,6 @@
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
-import { MOCK_ROUTES } from '@/data/mockRoutes';
-import { BusRoute, BusStop, BusStopWithDistance } from '@/types';
+import { BusRouteSummary, BusStop, BusStopWithDistance } from '@/types';
+import { getRoutesFromStops } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -30,8 +30,10 @@ export default function HomeSearchOverlay({
         if (!searchQuery.trim() || searchQuery.length < 2) return [];
 
         const q = searchQuery.toLocaleLowerCase('tr-TR').trim();
-        const foundRoutes = MOCK_ROUTES.filter(
-            (r) => r.routeNumber.toLocaleLowerCase('tr-TR').includes(q) || r.title.toLocaleLowerCase('tr-TR').includes(q)
+        const dynamicRoutes = getRoutesFromStops(allStops);
+
+        const foundRoutes = dynamicRoutes.filter(
+            (r) => r.routeNumber.toString().includes(q)
         ).map((r) => ({ type: 'route' as const, item: r }));
 
         const foundStops = allStops.filter(s => {
@@ -67,19 +69,19 @@ export default function HomeSearchOverlay({
                     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                         {results.map((res, i) => {
                             if (res.type === 'route') {
-                                const route = res.item as BusRoute;
+                                const route = res.item as BusRouteSummary;
                                 return (
                                     <TouchableOpacity
-                                        key={`route-${route.id}-${i}`}
+                                        key={`route-${route.routeNumber}-${i}`}
                                         style={styles.resultItem}
-                                        onPress={() => onPressRoute(route.id)}
+                                        onPress={() => onPressRoute(route.routeNumber.toString())}
                                     >
                                         <View style={[styles.iconBox, styles.routeIconBox]}>
                                             <Ionicons name="bus" size={16} color={Colors.white} />
                                         </View>
                                         <View style={styles.itemInfo}>
-                                            <Text style={styles.itemTitle}>{route.routeNumber} - {route.title}</Text>
-                                            <Text style={styles.itemSubtitle}>Hat</Text>
+                                            <Text style={styles.itemTitle}>Hat {route.routeNumber}</Text>
+                                            <Text style={styles.itemSubtitle}>{route.stopCount} duraktan geçiyor</Text>
                                         </View>
                                         <Ionicons name="chevron-forward" size={16} color={Colors.gray400} />
                                     </TouchableOpacity>
