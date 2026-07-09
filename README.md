@@ -1,56 +1,21 @@
-# Durak Yakınımda 👋
+# Durak Yakınımda - İztek Ulaşım Modülü
 
-Bu proje [Expo](https://expo.dev) kullanılarak İzmir ESHOT durakları için oluşturulmuş bir mobil navigasyon uygulamasıdır.
+## Proje Hakkında
+Bu proje, İzmir ESHOT toplu taşıma verilerini kullanan modern bir mobil navigasyon uygulamasıdır. Statik mock verilerden uzaklaşılarak doğrudan gerçek ESHOT Açık Veri Portalı API'lerine Canlı Entegrasyon (Faz 9) yapılmıştır. Proje React Native ve Expo tabanlıdır.
 
-## Başlarken
+## Mimari Ve Özellikler
+* **Çift Motorlu Yapı:** Durak isimleri ve global hat listeleri geçici bir Yerel Veritabanından (Static JSON) çekilirken, Yaklaşan Otobüsler ve Hat Konum koordinatları **Canlı ESHOT API'sinden** okunmaktadır.
+* **Tersine Mühendislik (Reverse Engineering):** `stops.json` dosyasındaki veriler taranarak (`routeData.ts`), o durakların barındırdığı hatlar dinamik olarak çıkartılmış ve tekilleştirilmiştir. Böylelikle herhangi bir statik "Hat Listesi" tutmaya gerek kalmadan veritabanı büyüdükçe hat listesi otomatik kendini üretecek duruma getirilmiştir.
+* **Gelişmiş Navigasyon:** Duraklar üzerinden hatlara, hatlardan duraklara doğrudan tıklayarak sınırsız ve kesintisiz iç gezinme deneyimi inşa edilmiştir.
 
-1. Install dependencies
+## Karşılaşılan Vakalar & Mimari Çözümler (Önemli Not)
+1. **Veri Tipi Çözünürlüğü (Virgüllü Stringler):** ESHOT API'sinden dönen `KoorX` ve `KoorY` konum verileri JSON standardı dışında "27,1434" formatında metinsel gelmektedir. Projeye özel yazılan `parseCoordinate` helper fonksiyonuyla bu değerler her zaman hatasız JavaScript sayılarına döner.
+2. **Boş Liste vs Hata Ayrımı:** API sıklıkla `HataVarMi: false` parametresi içerse de güncel array boş dönebilmektedir. Bu senaryo "404 Hata" olarak algılanmamış; "Hatta anlık çalışan aktif araç yok (Gece seferi veya terminal beklemesi)" olarak UI (EmptyState) katmanında yansıtılmıştır.
+3. **Mükerrer Ping Keşfi (Deduplication):** Araç Lokasyonları API'sinin, aynı `OtobusId` verisine ait iki ayrı pingi (önceki saatin koordinatından kalan log) aynı JSON içinde döndürdüğü keşfedilmiştir. Servisimizde `Map` nesnesi kurgulanarak araç kimliği tekilleştirilmiş ve her zaman hatasız tek bir araç markörü garantilenmiştir.
+4. **429 Rate Limiting (Anti-Spam) Koruması:** Kullanıcıların "Yenile" (Refresh) tuşlarına ardışık basması durumunda belediye sunucularından alınan DDoS blokajı (429 IP Limit); tüm butonların asenkron kilitler ve **15 Saniyelik Soğuma (Cooldown)** mekanizmalarıyla desteklenmesiyle tamamen ortadan kaldırılmıştır.
+5. **Kapsam Dışı Ekranlar:** Nasıl Giderim, Yönlendirme, QR ve Bildirimler gibi Frontend UI'ı bulunan ancak mimarisi henüz çizilmeyen menüler, planlanan sonraki fazlara aktarılmak üzere statik "Yakında" uyarı pencereleriyle (Alert) sınırlandırılmıştır.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Kurulum ve Test
+1. `npm install` komutuyla bağımlılıkları yükleyin.
+2. `npx expo start` veya `npm run start` ile Expo server'ını başlatın.
+3. Telefonunuzda Expo Go uygulaması ile karekodu okutun.

@@ -4,8 +4,8 @@ import { useFavorites } from '@/context/FavoritesContext';
 import { getApproachingBuses, getStopById } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus, BusStop } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function StopDetailScreen() {
@@ -22,6 +22,21 @@ export default function StopDetailScreen() {
         data: []
     });
 
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [refreshCountdown, setRefreshCountdown] = useState(0);
+    const isFetchingRef = useRef(false);
+
+    // 15 Saniyelik Geri Sayım (Cooldown) Efekti
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (refreshCountdown > 0) {
+            timer = setTimeout(() => {
+                setRefreshCountdown(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearTimeout(timer);
+    }, [refreshCountdown]);
+
     useEffect(() => {
         if (!id) return;
         getStopById(id).then(found => {
@@ -30,28 +45,48 @@ export default function StopDetailScreen() {
         });
     }, [id]);
 
-    const fetchBuses = () => {
-        if (!id) return;
+    const fetchBuses = (isAutoRefresh = false) => {
+        if (!id || isFetchingRef.current || (!isAutoRefresh && refreshCountdown > 0)) return;
+        isFetchingRef.current = true;
+
+        if (!isAutoRefresh) {
+            setRefreshCountdown(15);
+        }
+
         setApiState({ isLoading: true, isSuccess: false, isEmpty: false, errorMessage: null, data: [] });
 
         getApproachingBuses(id)
             .then(buses => {
+                // Kalan durak sayısına göre küçükten büyüğe sırala (null ise 999 vererek en sona at)
+                const sortedBuses = [...buses].sort((a, b) => {
+                    const countA = a.remainingStopCount !== null && a.remainingStopCount !== undefined ? a.remainingStopCount : 999;
+                    const countB = b.remainingStopCount !== null && b.remainingStopCount !== undefined ? b.remainingStopCount : 999;
+                    return countA - countB;
+                });
+
                 setApiState({
                     isLoading: false,
                     isSuccess: true,
-                    isEmpty: buses.length === 0,
+                    isEmpty: sortedBuses.length === 0,
                     errorMessage: null,
-                    data: buses
+                    data: sortedBuses
                 });
+                setLastUpdated(new Date());
             })
-            .catch(err => {
+            .catch((err: any) => {
+                const isRateLimit = err?.message?.includes('429');
                 setApiState({
                     isLoading: false,
                     isSuccess: false,
                     isEmpty: false,
-                    errorMessage: 'Yaklaşan otobüs bilgisi alınamadı. Lütfen tekrar deneyin.',
+                    errorMessage: isRateLimit
+                        ? 'Güvenlik Sistemi: Çok fazla istek atıldı. Lütfen 30 saniye bekleyip tekrar deneyin.'
+                        : 'Yaklaşan otobüs bilgisi alınamadı. Lütfen tekrar deneyin.',
                     data: []
                 });
+            })
+            .finally(() => {
+                isFetchingRef.current = false;
             });
     };
 
@@ -133,9 +168,14 @@ export default function StopDetailScreen() {
                     <Text style={styles.sectionTitle}>Geçen Hatlar ({stop.routes.length})</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.routesScroll}>
                         {stop.routes.length > 0 ? stop.routes.map((route) => (
-                            <View key={route} style={styles.routeChip}>
+                            <TouchableOpacity
+                                key={route}
+                                style={styles.routeChip}
+                                onPress={() => router.push(`/route/${route}`)}
+                                activeOpacity={0.7}
+                            >
                                 <Text style={styles.routeChipText}>{route}</Text>
-                            </View>
+                            </TouchableOpacity>
                         )) : (
                             <Text style={styles.metaLabel}>Hat bilgisi bulunmuyor</Text>
                         )}
@@ -146,11 +186,37 @@ export default function StopDetailScreen() {
                 <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionTitle}>Yaklaşan Otobüsler</Text>
-                        <TouchableOpacity onPress={fetchBuses} style={styles.refreshButton}>
-                            <Ionicons name="refresh" size={18} color={Colors.primary} />
-                            <Text style={styles.refreshText}>Yenile</Text>
+                        <TouchableOpacity
+                            onPress={() => fetchBuses(false)}
+                            disabled={apiState.isLoading || refreshCountdown > 0}
+                            style={[
+                                styles.refreshButton,
+                                (apiState.isLoading || refreshCountdown > 0) && { opacity: 0.6 }
+                            ]}
+                        >
+                            <Ionicons
+                                name="refresh"
+                                size={18}
+                                color={(apiState.isLoading || refreshCountdown > 0) ? Colors.gray400 : Colors.primary}
+                            />
+                            <Text style={[
+                                styles.refreshText,
+                                (apiState.isLoading || refreshCountdown > 0) && { color: Colors.gray400 }
+                            ]}>
+                                {apiState.isLoading
+                                    ? 'Yükleniyor...'
+                                    : refreshCountdown > 0
+                                        ? `Yenile (${refreshCountdown}s)`
+                                        : 'Yenile'}
+                            </Text>
                         </TouchableOpacity>
                     </View>
+
+                    {lastUpdated && (
+                        <Text style={styles.lastUpdateText}>
+                            Son güncelleme: {lastUpdated.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </Text>
+                    )}
 
                     {apiState.isLoading ? (
                         <View style={styles.emptyState}>
@@ -161,7 +227,7 @@ export default function StopDetailScreen() {
                         <View style={styles.emptyState}>
                             <Ionicons name="alert-circle-outline" size={36} color={Colors.error} />
                             <Text style={[styles.emptyText, { color: Colors.error }]}>{apiState.errorMessage}</Text>
-                            <TouchableOpacity onPress={fetchBuses} style={[styles.refreshButton, { marginTop: Spacing.sm, backgroundColor: Colors.error + '20' }]}>
+                            <TouchableOpacity onPress={() => fetchBuses(false)} style={[styles.refreshButton, { marginTop: Spacing.sm, backgroundColor: Colors.error + '20' }]}>
                                 <Ionicons name="refresh" size={16} color={Colors.error} />
                                 <Text style={[styles.refreshText, { color: Colors.error }]}>Yeniden Dene</Text>
                             </TouchableOpacity>
@@ -174,13 +240,22 @@ export default function StopDetailScreen() {
                     ) : (
                         <View style={styles.busList}>
                             {apiState.data?.map((bus, index) => (
-                                <View key={`${bus.busId}-${index}`} style={styles.newBusCard}>
+                                <TouchableOpacity
+                                    key={`${bus.busId}-${index}`}
+                                    style={styles.newBusCard}
+                                    onPress={() => router.push(`/route/${bus.routeNumber}`)}
+                                    activeOpacity={0.7}
+                                >
                                     <Text style={styles.newBusTitle}>{bus.routeNumber} - {bus.routeName}</Text>
-                                    <Text style={styles.newBusDetail}>Kalan durak: {bus.remainingStopCount}</Text>
+                                    <Text style={styles.newBusDetail}>
+                                        {bus.remainingStopCount !== null && bus.remainingStopCount !== undefined
+                                            ? `Kalan durak: ${bus.remainingStopCount}`
+                                            : 'Kalan durak bilgisi yok'}
+                                    </Text>
                                     <Text style={styles.newBusDetail}>Yön: {bus.direction}</Text>
                                     <Text style={styles.newBusDetail}>Engelli erişimi: {bus.isAccessible ? 'Var' : 'Yok'}</Text>
                                     <Text style={styles.newBusDetail}>Bisiklet aparatı: {bus.hasBicycleRack ? 'Var' : 'Yok'}</Text>
-                                </View>
+                                </TouchableOpacity>
                             ))}
                         </View>
                     )}
@@ -282,6 +357,12 @@ const styles = StyleSheet.create({
         fontSize: FontSizes.sm,
         color: Colors.primary,
         fontWeight: FontWeights.bold,
+    },
+    lastUpdateText: {
+        fontSize: FontSizes.xs,
+        color: Colors.textDisabled,
+        marginBottom: Spacing.sm,
+        textAlign: 'right',
     },
     busList: {
         flex: 1,

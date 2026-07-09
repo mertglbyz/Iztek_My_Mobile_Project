@@ -6,7 +6,7 @@ import { ApiResponseState, ApproachingBus } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,8 +28,29 @@ export default function RouteDetailScreen() {
     });
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [refreshCountdown, setRefreshCountdown] = useState(0);
+    const isFetchingRef = useRef(false);
 
-    const fetchVehicles = useCallback(async () => {
+    // 15 Saniyelik Geri Sayım (Cooldown) Efekti
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (refreshCountdown > 0) {
+            timer = setTimeout(() => {
+                setRefreshCountdown(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearTimeout(timer);
+    }, [refreshCountdown]);
+
+    const fetchVehicles = useCallback(async (isAutoRefresh = false) => {
+        // Zaten çekiyorsa veya kullanıcı manuel basıp cooldowndaysa iptal et
+        if (isFetchingRef.current || (!isAutoRefresh && refreshCountdown > 0)) return;
+        isFetchingRef.current = true;
+
+        if (!isAutoRefresh) {
+            setRefreshCountdown(15); // Kullanıcı kendi bastıysa 15 sn ceza kes
+        }
+
         setVehiclesState(prev => ({ ...prev, isLoading: true, errorMessage: null }));
         try {
             const data = await getRouteVehicles(id);
@@ -41,21 +62,26 @@ export default function RouteDetailScreen() {
                 data
             });
             setLastUpdated(new Date());
-        } catch (error) {
+        } catch (error: any) {
+            const isRateLimit = error?.message?.includes('429');
             setVehiclesState({
                 isLoading: false,
                 isSuccess: false,
                 isEmpty: false,
-                errorMessage: 'Araç konumları alınamadı. Lütfen tekrar deneyin.',
+                errorMessage: isRateLimit
+                    ? 'Güvenlik Sistemi: Çok fazla istek atıldı. Lütfen 30 saniye bekleyip tekrar deneyin.'
+                    : 'Araç konumları alınamadı. Lütfen tekrar deneyin.',
                 data: []
             });
+        } finally {
+            isFetchingRef.current = false;
         }
     }, [id]);
 
     // Ekrana ilk girişte ve 30 saniyede bir araçları güncelle
     useEffect(() => {
-        fetchVehicles();
-        const interval = setInterval(fetchVehicles, 30000);
+        fetchVehicles(true); // Auto-refresh sayılır
+        const interval = setInterval(() => fetchVehicles(true), 30000);
         return () => clearInterval(interval);
     }, [fetchVehicles]);
 
@@ -111,20 +137,27 @@ export default function RouteDetailScreen() {
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Aktif Araçlar</Text>
                         <TouchableOpacity
-                            onPress={fetchVehicles}
-                            disabled={vehiclesState.isLoading}
-                            style={styles.refreshButton}
+                            onPress={() => fetchVehicles(false)}
+                            disabled={vehiclesState.isLoading || refreshCountdown > 0}
+                            style={[
+                                styles.refreshButton,
+                                (vehiclesState.isLoading || refreshCountdown > 0) && { opacity: 0.6 }
+                            ]}
                         >
                             <Ionicons
                                 name="refresh"
                                 size={18}
-                                color={vehiclesState.isLoading ? Colors.gray400 : Colors.primary}
+                                color={(vehiclesState.isLoading || refreshCountdown > 0) ? Colors.gray400 : Colors.primary}
                             />
                             <Text style={[
                                 styles.refreshText,
-                                vehiclesState.isLoading && { color: Colors.gray400 }
+                                (vehiclesState.isLoading || refreshCountdown > 0) && { color: Colors.gray400 }
                             ]}>
-                                {vehiclesState.isLoading ? 'Yükleniyor...' : 'Yenile'}
+                                {vehiclesState.isLoading
+                                    ? 'Yükleniyor...'
+                                    : refreshCountdown > 0
+                                        ? `Yenile (${refreshCountdown}s)`
+                                        : 'Yenile'}
                             </Text>
                         </TouchableOpacity>
                     </View>

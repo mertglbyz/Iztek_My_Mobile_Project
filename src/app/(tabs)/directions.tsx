@@ -1,9 +1,10 @@
 import ScreenHeader from '@/components/common/ScreenHeader';
-import { MOCK_TRIP_SUGGESTIONS } from '@/data/mockRoutes';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
+import { MOCK_TRIP_SUGGESTIONS } from '@/data/mockRoutes';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -15,10 +16,11 @@ import {
 export default function DirectionsScreen() {
     const [origin, setOrigin] = useState('Konak Meydan');
     const [destination, setDestination] = useState('Bostanlı İskele');
-    const [showResults, setShowResults] = useState(true);
+    const [showResults, setShowResults] = useState(false);
 
     const handleSearch = () => {
-        setShowResults(true);
+        Alert.alert('Yakında', 'Rota planlama (Nasıl Giderim) özelliği henüz entegre edilmemiştir.');
+        setShowResults(false);
     };
 
     const swapLocations = () => {

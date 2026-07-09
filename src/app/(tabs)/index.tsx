@@ -1,7 +1,7 @@
 import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ActionCard from '@/components/home/ActionCard';
@@ -40,7 +40,7 @@ export default function HomeScreen() {
                 <SearchBar
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    onPressQr={() => console.log('QR tarayıcı açıldı')}
+                    onPressQr={() => Alert.alert('Yakında', 'QR okuyucu özelliği yakında eklenecektir.')}
                 />
 
                 {/* Alt kısımdaki her şeyi (liste ve arama sonucu) kapsayan Wrapper */}
@@ -74,7 +74,7 @@ export default function HomeScreen() {
                                 iconName="map-outline"
                                 iconColor={Colors.accent}
                                 iconBg={Colors.accentSoft}
-                                onPress={() => router.push('/(tabs)/directions')}
+                                onPress={() => Alert.alert('Yakında', 'Rota planlama (Nasıl Giderim) özelliği geliştirme aşamasındadır.')}
                             />
                             <View style={styles.cardGap} />
                             <ActionCard

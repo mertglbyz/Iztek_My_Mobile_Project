@@ -1,6 +1,6 @@
 import { Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface HeaderProps { }
 
@@ -20,7 +20,11 @@ export default function Header({ }: HeaderProps) {
                     <Text style={styles.subtitle}>İzmir ulaşımına hoş geldiniz</Text>
                 </View>
                 <View style={styles.actions}>
-                    <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        activeOpacity={0.7}
+                        onPress={() => Alert.alert('Yakında', 'Bildirim özellikleri yakında eklenecektir.')}
+                    >
                         <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
                     </TouchableOpacity>
                 </View>
