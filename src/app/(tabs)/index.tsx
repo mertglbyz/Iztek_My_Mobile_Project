@@ -1,7 +1,7 @@
 import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Keyboard, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ActionCard from '@/components/home/ActionCard';
@@ -23,11 +23,13 @@ export default function HomeScreen() {
     const [activeTab, setActiveTab] = useState(0);
 
     const handlePressRoute = (routeId: string) => {
+        Keyboard.dismiss();
         setSearchQuery('');
         router.push(`/route/${routeId}`);
     };
 
     const handlePressStop = (stop: BusStopWithDistance) => {
+        Keyboard.dismiss();
         setSearchQuery('');
         router.push(`/stop/${stop.id}` as any);
     };

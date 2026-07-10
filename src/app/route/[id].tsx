@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Callout, Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RouteDetailScreen() {
@@ -30,6 +31,7 @@ export default function RouteDetailScreen() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [refreshCountdown, setRefreshCountdown] = useState(0);
     const isFetchingRef = useRef(false);
+    const mapRef = useRef<MapView>(null); // Harita kontrolü için Referans
 
     // 15 Saniyelik Geri Sayım (Cooldown) Efekti
     useEffect(() => {
@@ -78,10 +80,22 @@ export default function RouteDetailScreen() {
         }
     }, [id]);
 
-    // Ekrana ilk girişte ve 30 saniyede bir araçları güncelle
+    // Araç listesindeki karta tıklanınca o otobüse (haritada) yakınlaşma
+    const handleVehiclePress = useCallback((bus: ApproachingBus) => {
+        if (!bus.latitude || !bus.longitude) return;
+
+        mapRef.current?.animateToRegion({
+            latitude: bus.latitude as number,
+            longitude: bus.longitude as number,
+            latitudeDelta: 0.015,
+            longitudeDelta: 0.015,
+        }, 800); // 800ms yumuşak geçiş
+    }, []);
+
+    // Ekrana ilk girişte ve 60 saniyede bir araçları güncelle
     useEffect(() => {
         fetchVehicles(true); // Auto-refresh sayılır
-        const interval = setInterval(() => fetchVehicles(true), 30000);
+        const interval = setInterval(() => fetchVehicles(true), 60000); // UI Perfonmansı için süre 60 saniyeye çıkarıldı
         return () => clearInterval(interval);
     }, [fetchVehicles]);
 
@@ -184,23 +198,66 @@ export default function RouteDetailScreen() {
                             <Text style={styles.stateText}>Şu an hatta aktif araç bulunmuyor.</Text>
                         </View>
                     ) : (
-                        <View style={styles.vehiclesList}>
-                            {vehiclesState.data?.map((bus, idx) => (
-                                <View key={`bus-${bus.busId}-${idx}`} style={styles.vehicleCard}>
-                                    <View style={styles.vehicleIconBox}>
-                                        <Ionicons name="bus" size={20} color={Colors.white} />
-                                    </View>
-                                    <View style={styles.vehicleInfo}>
-                                        <Text style={styles.vehicleId}>Araç No: {bus.busId}</Text>
-                                        <Text style={styles.vehicleLocation}>GPS: {bus.latitude?.toFixed(4)}, {bus.longitude?.toFixed(4)}</Text>
-                                    </View>
-                                    <View style={styles.liveBadge}>
-                                        <View style={styles.liveDot} />
-                                        <Text style={styles.liveText}>Canlı</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
+                        <>
+                            <View style={styles.mapContainer}>
+                                <MapView
+                                    ref={mapRef}
+                                    style={styles.map}
+                                    initialRegion={{
+                                        latitude: vehiclesState.data?.[0]?.latitude || 38.4237,
+                                        longitude: vehiclesState.data?.[0]?.longitude || 27.1428,
+                                        latitudeDelta: 0.05,
+                                        longitudeDelta: 0.05,
+                                    }}
+                                >
+                                    {vehiclesState.data?.map((bus, idx) => (
+                                        <Marker
+                                            key={`bus-${bus.busId}-${idx}`}
+                                            coordinate={{ latitude: bus.latitude as number, longitude: bus.longitude as number }}
+                                        >
+                                            <View style={styles.busMarker}>
+                                                <Ionicons name="bus" size={16} color={Colors.white} />
+                                            </View>
+                                            <Callout tooltip>
+                                                <View style={styles.calloutContainer}>
+                                                    <Text style={styles.calloutTitle}>Araç No: {bus.busId}</Text>
+                                                    {bus.direction && <Text style={styles.calloutSubtitle}>Yön: {bus.direction}</Text>}
+                                                </View>
+                                            </Callout>
+                                        </Marker>
+                                    ))}
+                                </MapView>
+                            </View>
+
+                            {/* AKTİF ARAÇLARIN LİSTE (KART) GÖRÜNÜMÜ - Yatay Scroll UI/UX */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.vehiclesListHorizontal}
+                            >
+                                {vehiclesState.data?.map((bus, idx) => (
+                                    <TouchableOpacity
+                                        key={`bus-card-${bus.busId}-${idx}`}
+                                        style={styles.vehicleCardHorizontal}
+                                        onPress={() => handleVehiclePress(bus)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.vehicleIconBox}>
+                                            <Ionicons name="bus" size={16} color={Colors.white} />
+                                        </View>
+                                        <View style={styles.vehicleInfo}>
+                                            <Text style={styles.vehicleId}>Araç No: {bus.busId}</Text>
+                                            <Text style={styles.vehicleLocation} numberOfLines={1}>
+                                                {bus.direction ? `Yön: ${bus.direction}` : `GPS: ${bus.latitude?.toFixed(2)}, ${bus.longitude?.toFixed(2)}`}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.liveBadgeSmall}>
+                                            <View style={styles.liveDot} />
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </>
                     )}
                 </View>
 
@@ -238,8 +295,8 @@ export default function RouteDetailScreen() {
                         })}
                     </View>
                 </View>
-            </ScrollView>
-        </View>
+            </ScrollView >
+        </View >
     );
 }
 
@@ -371,61 +428,96 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
         textAlign: 'center',
     },
-    vehiclesList: {
-        gap: Spacing.sm,
+    mapContainer: {
+        height: 300,
+        borderRadius: BorderRadius.xl,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: Colors.gray200,
         marginBottom: Spacing.base,
     },
-    vehicleCard: {
+    map: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    busMarker: {
+        backgroundColor: Colors.primary,
+        padding: 6,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: Colors.white,
+        ...Shadows.sm,
+    },
+    calloutContainer: {
+        backgroundColor: Colors.white,
+        padding: Spacing.sm,
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        ...Shadows.md,
+        minWidth: 120,
+        alignItems: 'center',
+    },
+    calloutTitle: {
+        fontSize: FontSizes.sm,
+        fontWeight: FontWeights.bold,
+        color: Colors.textPrimary,
+        marginBottom: 2,
+    },
+    calloutSubtitle: {
+        fontSize: FontSizes.xs,
+        color: Colors.textSecondary,
+    },
+    vehiclesListHorizontal: {
+        gap: Spacing.sm,
+        paddingBottom: Spacing.sm,
+    },
+    vehicleCardHorizontal: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.white,
-        padding: Spacing.md,
-        borderRadius: BorderRadius.xl,
+        padding: Spacing.sm,
+        borderRadius: BorderRadius.lg,
         borderWidth: 1,
         borderColor: Colors.gray200,
         ...Shadows.sm,
+        width: 160,
     },
     vehicleIconBox: {
-        width: 40,
-        height: 40,
-        borderRadius: BorderRadius.md,
+        width: 32,
+        height: 32,
+        borderRadius: BorderRadius.sm,
         backgroundColor: Colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: Spacing.md,
+        marginRight: Spacing.sm,
     },
     vehicleInfo: {
         flex: 1,
     },
     vehicleId: {
-        fontSize: FontSizes.sm,
+        fontSize: FontSizes.xs,
         fontWeight: FontWeights.bold,
         color: Colors.textPrimary,
     },
     vehicleLocation: {
-        fontSize: FontSizes.xs,
+        fontSize: 10,
         color: Colors.textSecondary,
         marginTop: 2,
     },
-    liveBadge: {
-        flexDirection: 'row',
+    liveBadgeSmall: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
         alignItems: 'center',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        paddingHorizontal: Spacing.sm,
-        paddingVertical: 4,
-        borderRadius: BorderRadius.full,
-        gap: 4,
+        justifyContent: 'center',
+        marginLeft: Spacing.xs,
     },
     liveDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 4,
+        height: 4,
+        borderRadius: 2,
         backgroundColor: '#EF4444',
-    },
-    liveText: {
-        fontSize: FontSizes.xs,
-        fontWeight: FontWeights.bold,
-        color: '#EF4444',
     },
     // ---- TİMELİNE STİLLERİ ----
     timeline: {

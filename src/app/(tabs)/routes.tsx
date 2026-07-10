@@ -6,7 +6,7 @@ import { getRoutesFromStops } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function RoutesScreen() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -15,13 +15,15 @@ export default function RoutesScreen() {
     // Mevcut durak verilerinden dinamik olarak gerçek hat dizisini (routes array) üret
     const dynamicRoutes = useMemo(() => getRoutesFromStops(stops), [stops]);
 
-    // Arama fonksiyonu: string bazlı filtreleme
+    // Arama fonksiyonu: string bazlı filtreleme ve performans için max 50 sonuç
     const filteredRoutes = useMemo(() => {
         const q = searchQuery.toLowerCase().trim();
+        // Arama yapılmamışsa tüm hatları göster (FlatList sanallaştırmasıyla performansı yönetir)
         if (!q) return dynamicRoutes;
+
         return dynamicRoutes.filter(
             (route) => route.routeNumber.toString().includes(q)
-        );
+        ).slice(0, 50);
     }, [searchQuery, dynamicRoutes]);
 
     return (
@@ -56,32 +58,39 @@ export default function RoutesScreen() {
                 </View>
             </View>
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-                automaticallyAdjustKeyboardInsets={true}
-            >
-                {filteredRoutes.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="search" size={40} color={Colors.gray300} />
-                        <Text style={styles.emptyText}>Sonuç bulunamadı</Text>
-                    </View>
-                ) : (
-                    filteredRoutes.map((route) => (
+            {filteredRoutes.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Ionicons name="search" size={40} color={Colors.gray300} />
+                    <Text style={styles.emptyText}>Sonuç bulunamadı</Text>
+                </View>
+            ) : (
+                <FlatList
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                    automaticallyAdjustKeyboardInsets={true}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    data={filteredRoutes}
+                    keyExtractor={(item) => `route-${item.routeNumber}`}
+                    renderItem={({ item: route }) => (
                         <FavoriteListItem
-                            key={`route-${route.routeNumber}`}
                             variant="route"
                             badgeText={route.routeNumber.toString()}
                             title={`Hat ${route.routeNumber}`}
                             subtitle={`${route.stopCount} duraktan geçiyor`}
-                            onPress={() => router.push(`/route/${route.routeNumber}`)}
+                            onPress={() => {
+                                Keyboard.dismiss();
+                                setSearchQuery('');
+                                router.push(`/route/${route.routeNumber}`);
+                            }}
                         />
-                    ))
-                )}
-            </ScrollView>
+                    )}
+                />
+            )}
         </View>
     );
 }

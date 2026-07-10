@@ -10,10 +10,10 @@ const lines = csvData.split('\n').filter(line => line.trim() !== '');
 // Header: DURAK_ID, DURAK_ADI, ENLEM, BOYLAM, DURAKTAN_GECEN_HATLAR
 const header = lines[0].split(';').map(h => h.trim());
 
-// We need 50 valid stops
+// We need ALL valid stops
 const stops = [];
 
-for (let i = 1; i < lines.length && stops.length < 50; i++) {
+for (let i = 1; i < lines.length; i++) {
     const rawCols = lines[i].split(';');
     if (rawCols.length < 5) continue;
 

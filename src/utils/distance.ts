@@ -58,16 +58,16 @@ export function getSortedStopsByDistance(
 /**
  * Durakları isim veya numara ile filtreler
  */
-export function filterStops(stops: BusStop[], query: string): BusStop[] {
-    const q = query.toLowerCase().trim();
+export function filterStops(stops: BusStop[], query: string | number): BusStop[] {
+    const q = String(query).toLocaleLowerCase('tr-TR').trim();
     if (!q) return stops;
 
     const qNum = Number(q);
 
     return stops.filter(
         (stop) =>
-            stop.name.toLowerCase().includes(q) ||
-            stop.id.toString().includes(q) ||
+            String(stop.name).toLocaleLowerCase('tr-TR').includes(q) ||
+            String(stop.id).includes(q) ||
             (!isNaN(qNum) && stop.routes.includes(qNum))
     );
 }

@@ -3,7 +3,7 @@ import { BusRouteSummary, BusStop, BusStopWithDistance } from '@/types';
 import { getRoutesFromStops } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface SearchResult {
     type: 'route' | 'stop';
@@ -66,13 +66,16 @@ export default function HomeSearchOverlay({
             <View style={styles.resultsContainer}>
                 <Text style={styles.headerTitle}>Arama Sonuçları</Text>
                 {results.length > 0 ? (
-                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                        {results.map((res, i) => {
+                    <FlatList
+                        data={results}
+                        keyExtractor={(res, i) => `${res.type}-${res.type === 'route' ? res.item.routeNumber : res.item.id}-${i}`}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        renderItem={({ item: res }) => {
                             if (res.type === 'route') {
                                 const route = res.item as BusRouteSummary;
                                 return (
                                     <TouchableOpacity
-                                        key={`route-${route.routeNumber}-${i}`}
                                         style={styles.resultItem}
                                         onPress={() => onPressRoute(route.routeNumber.toString())}
                                     >
@@ -90,7 +93,6 @@ export default function HomeSearchOverlay({
                                 const stop = res.item as BusStopWithDistance;
                                 return (
                                     <TouchableOpacity
-                                        key={`stop-${stop.id}-${i}`}
                                         style={styles.resultItem}
                                         onPress={() => onPressStop(stop)}
                                     >
@@ -105,8 +107,8 @@ export default function HomeSearchOverlay({
                                     </TouchableOpacity>
                                 );
                             }
-                        })}
-                    </ScrollView>
+                        }}
+                    />
                 ) : (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="search-outline" size={32} color={Colors.gray400} />
