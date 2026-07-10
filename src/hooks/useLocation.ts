@@ -7,7 +7,7 @@ interface UseLocationResult {
     permissionStatus: LocationPermissionStatus;
     isLoading: boolean;
     error: string | null;
-    requestPermission: () => Promise<void>;
+    requestPermission: (skipLoading?: boolean) => Promise<void>;
 }
 
 export function useLocation(): UseLocationResult {
@@ -16,8 +16,8 @@ export function useLocation(): UseLocationResult {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const requestPermission = async () => {
-        setIsLoading(true);
+    const requestPermission = async (skipLoading = false) => {
+        if (!skipLoading) setIsLoading(true);
         setError(null);
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
@@ -31,7 +31,7 @@ export function useLocation(): UseLocationResult {
         } catch {
             setError('Konum izni alınamadı.');
         } finally {
-            setIsLoading(false);
+            if (!skipLoading) setIsLoading(false);
         }
     };
 

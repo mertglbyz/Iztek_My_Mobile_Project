@@ -8,7 +8,7 @@ import { BusStopWithDistance } from '@/types';
 import { getSortedStopsByDistance } from '@/utils/distance';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList,
@@ -26,6 +26,7 @@ export default function NearbyScreen() {
     const { location, isLoading, error, permissionStatus, requestPermission } = useLocation();
     const { addFavoriteStop, removeFavoriteStop, isFavoriteStop } = useFavorites();
     const { stops: allStops, isLoadingStops } = useStops();
+    const mapRef = useRef<MapView>(null);
 
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [cooldown, setCooldown] = useState(0);
@@ -50,7 +51,7 @@ export default function NearbyScreen() {
     const handleRefresh = useCallback(async () => {
         if (cooldown > 0) return;
         setIsRefreshing(true);
-        await requestPermission();
+        await requestPermission(true); // Haritayı unmount etmeden sadece veriyi yenile
         setIsRefreshing(false);
         setCooldown(15); // 15 Saniyelik bekleme süresi eklendi
     }, [requestPermission, cooldown]);
@@ -79,7 +80,7 @@ export default function NearbyScreen() {
                     <Text style={styles.permissionText}>
                         Yakınızdaki durakları gösterebilmemiz için konum izninize ihtiyacımız var.
                     </Text>
-                    <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.permissionButton} onPress={() => requestPermission()} activeOpacity={0.8}>
                         <Ionicons name="navigate" size={18} color={Colors.white} />
                         <Text style={styles.permissionButtonText}>Konumu Etkinleştir</Text>
                     </TouchableOpacity>
@@ -110,7 +111,7 @@ export default function NearbyScreen() {
                     <Ionicons name="warning-outline" size={48} color={Colors.error} />
                     <Text style={styles.permissionTitle}>Konum Alınamadı</Text>
                     <Text style={styles.permissionText}>{error}</Text>
-                    <TouchableOpacity style={styles.permissionButton} onPress={requestPermission} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.permissionButton} onPress={() => requestPermission()} activeOpacity={0.8}>
                         <Text style={styles.permissionButtonText}>Tekrar Dene</Text>
                     </TouchableOpacity>
                 </View>
@@ -129,6 +130,7 @@ export default function NearbyScreen() {
             {location && (
                 <View style={styles.mapContainer}>
                     <MapView
+                        ref={mapRef}
                         style={styles.map}
                         initialRegion={{
                             latitude: location.latitude,
@@ -143,6 +145,14 @@ export default function NearbyScreen() {
                             <Marker
                                 key={`map-marker-${stop.id}`}
                                 coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                                onPress={() => {
+                                    mapRef.current?.animateToRegion({
+                                        latitude: stop.latitude,
+                                        longitude: stop.longitude,
+                                        latitudeDelta: 0.005,
+                                        longitudeDelta: 0.005
+                                    }, 400);
+                                }}
                             >
                                 <Callout tooltip onPress={() => router.push(`/stop/${stop.id}` as any)}>
                                     <View style={styles.calloutContainer}>

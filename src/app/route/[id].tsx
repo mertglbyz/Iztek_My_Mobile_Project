@@ -1,5 +1,6 @@
 import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
+import { useFavorites } from '@/context/FavoritesContext';
 import { useStops } from '@/context/StopsContext';
 import { getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
@@ -7,7 +8,7 @@ import { getStopsForRoute } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +16,7 @@ export default function RouteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>(); // Tıklanan Hat Numarası
     const insets = useSafeAreaInsets();
     const { stops: allStops } = useStops();
+    const { addFavoriteRoute, removeFavoriteRoute, isFavoriteRoute } = useFavorites();
 
     // Mock sistemi kaldırıldığı için dinamik olarak bu hattan geçen durakları bul
     const routeStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
@@ -30,6 +32,7 @@ export default function RouteDetailScreen() {
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [refreshCountdown, setRefreshCountdown] = useState(0);
+    const [isScrollEnabled, setIsScrollEnabled] = useState(true);
     const isFetchingRef = useRef(false);
     const mapRef = useRef<MapView>(null); // Harita kontrolü için Referans
 
@@ -113,8 +116,19 @@ export default function RouteDetailScreen() {
         );
     }
 
+    const isFavorite = isFavoriteRoute(id);
+
     const handleToggleFavorite = () => {
-        Alert.alert("Yakında", "Hat favorileme sistemi gerçek sunucuya geçişte aktif edilecektir.");
+        if (isFavorite) {
+            removeFavoriteRoute(id);
+        } else {
+            addFavoriteRoute({
+                id,
+                routeNumber: id,
+                title: `Hat ${id}`,
+                operatingHours: `${routeStops.length} durak rotasında`
+            } as any);
+        }
     };
 
     return (
@@ -132,147 +146,174 @@ export default function RouteDetailScreen() {
                 </View>
 
                 <TouchableOpacity onPress={handleToggleFavorite} style={styles.iconButton}>
-                    <Ionicons name="star-outline" size={24} color={Colors.white} />
+                    <Ionicons name={isFavorite ? "star" : "star-outline"} size={24} color={isFavorite ? Colors.accent : Colors.white} />
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* HAT BİLGİSİ */}
-                <View style={styles.infoCard}>
-                    <Text style={styles.routeTitle}>Hat {id}</Text>
-                    <View style={styles.timeRow}>
-                        <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
-                        <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
-                    </View>
-                </View>
+            <FlatList
+                data={routeStops}
+                keyExtractor={(item, index) => `route-stop-${item.id}-${index}`}
+                style={styles.scrollView}
+                contentContainerStyle={{ paddingBottom: Spacing.xxxl }}
+                showsVerticalScrollIndicator={false}
+                scrollEnabled={isScrollEnabled}
+                ListHeaderComponent={
+                    <>
 
-                {/* AKTİF ARAÇLAR */}
-                <View style={styles.sectionContainer}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Aktif Araçlar</Text>
-                        <TouchableOpacity
-                            onPress={() => fetchVehicles(false)}
-                            disabled={vehiclesState.isLoading || refreshCountdown > 0}
-                            style={[
-                                styles.refreshButton,
-                                (vehiclesState.isLoading || refreshCountdown > 0) && { opacity: 0.6 }
-                            ]}
-                        >
-                            <Ionicons
-                                name="refresh"
-                                size={18}
-                                color={(vehiclesState.isLoading || refreshCountdown > 0) ? Colors.gray400 : Colors.primary}
-                            />
-                            <Text style={[
-                                styles.refreshText,
-                                (vehiclesState.isLoading || refreshCountdown > 0) && { color: Colors.gray400 }
-                            ]}>
-                                {vehiclesState.isLoading
-                                    ? 'Yükleniyor...'
-                                    : refreshCountdown > 0
-                                        ? `Yenile (${refreshCountdown}s)`
-                                        : 'Yenile'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                        {/* HAT BİLGİSİ */}
+                        <View style={styles.infoCard}>
+                            <Text style={styles.routeTitle}>Hat {id}</Text>
+                            <View style={styles.timeRow}>
+                                <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
+                                <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
+                            </View>
+                        </View>
 
-                    {lastUpdated && (
-                        <Text style={styles.lastUpdateText}>
-                            Son güncelleme: {lastUpdated.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </Text>
-                    )}
-
-                    {vehiclesState.isLoading && !vehiclesState.data?.length ? (
-                        <View style={styles.stateCard}>
-                            <Ionicons name="bus-outline" size={32} color={Colors.gray400} />
-                            <Text style={styles.stateText}>Araç konumları aranıyor...</Text>
-                        </View>
-                    ) : vehiclesState.errorMessage ? (
-                        <View style={[styles.stateCard, { borderColor: Colors.error }]}>
-                            <Ionicons name="warning-outline" size={32} color={Colors.error} />
-                            <Text style={[styles.stateText, { color: Colors.error }]}>{vehiclesState.errorMessage}</Text>
-                        </View>
-                    ) : vehiclesState.isEmpty ? (
-                        <View style={styles.stateCard}>
-                            <Ionicons name="moon-outline" size={32} color={Colors.gray400} />
-                            <Text style={styles.stateText}>Şu an hatta aktif araç bulunmuyor.</Text>
-                        </View>
-                    ) : (
-                        <>
-                            <View style={styles.mapContainer}>
-                                <MapView
-                                    ref={mapRef}
-                                    style={styles.map}
-                                    initialRegion={{
-                                        latitude: vehiclesState.data?.[0]?.latitude || 38.4237,
-                                        longitude: vehiclesState.data?.[0]?.longitude || 27.1428,
-                                        latitudeDelta: 0.05,
-                                        longitudeDelta: 0.05,
-                                    }}
+                        {/* AKTİF ARAÇLAR */}
+                        <View style={styles.sectionContainer}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Aktif Araçlar</Text>
+                                <TouchableOpacity
+                                    onPress={() => fetchVehicles(false)}
+                                    disabled={vehiclesState.isLoading || refreshCountdown > 0}
+                                    style={[
+                                        styles.refreshButton,
+                                        (vehiclesState.isLoading || refreshCountdown > 0) && { opacity: 0.6 }
+                                    ]}
                                 >
-                                    {vehiclesState.data?.map((bus, idx) => (
-                                        <Marker
-                                            key={`bus-${bus.busId}-${idx}`}
-                                            coordinate={{ latitude: bus.latitude as number, longitude: bus.longitude as number }}
-                                        >
-                                            <View style={styles.busMarker}>
-                                                <Ionicons name="bus" size={16} color={Colors.white} />
-                                            </View>
-                                            <Callout tooltip>
-                                                <View style={styles.calloutContainer}>
-                                                    <Text style={styles.calloutTitle}>Araç No: {bus.busId}</Text>
-                                                    {bus.direction && <Text style={styles.calloutSubtitle}>Yön: {bus.direction}</Text>}
-                                                </View>
-                                            </Callout>
-                                        </Marker>
-                                    ))}
-                                </MapView>
+                                    <Ionicons
+                                        name="refresh"
+                                        size={18}
+                                        color={(vehiclesState.isLoading || refreshCountdown > 0) ? Colors.gray400 : Colors.primary}
+                                    />
+                                    <Text style={[
+                                        styles.refreshText,
+                                        (vehiclesState.isLoading || refreshCountdown > 0) && { color: Colors.gray400 }
+                                    ]}>
+                                        {vehiclesState.isLoading
+                                            ? 'Yükleniyor...'
+                                            : refreshCountdown > 0
+                                                ? `Yenile (${refreshCountdown}s)`
+                                                : 'Yenile'}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
 
-                            {/* AKTİF ARAÇLARIN LİSTE (KART) GÖRÜNÜMÜ - Yatay Scroll UI/UX */}
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.vehiclesListHorizontal}
-                            >
-                                {vehiclesState.data?.map((bus, idx) => (
-                                    <TouchableOpacity
-                                        key={`bus-card-${bus.busId}-${idx}`}
-                                        style={styles.vehicleCardHorizontal}
-                                        onPress={() => handleVehiclePress(bus)}
-                                        activeOpacity={0.7}
+                            {lastUpdated && (
+                                <Text style={styles.lastUpdateText}>
+                                    Son güncelleme: {lastUpdated.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                </Text>
+                            )}
+
+                            {vehiclesState.isLoading && !vehiclesState.data?.length ? (
+                                <View style={styles.stateCard}>
+                                    <Ionicons name="bus-outline" size={32} color={Colors.gray400} />
+                                    <Text style={styles.stateText}>Araç konumları aranıyor...</Text>
+                                </View>
+                            ) : vehiclesState.errorMessage ? (
+                                <View style={[styles.stateCard, { borderColor: Colors.error }]}>
+                                    <Ionicons name="warning-outline" size={32} color={Colors.error} />
+                                    <Text style={[styles.stateText, { color: Colors.error }]}>{vehiclesState.errorMessage}</Text>
+                                </View>
+                            ) : vehiclesState.isEmpty ? (
+                                <View style={styles.stateCard}>
+                                    <Ionicons name="moon-outline" size={32} color={Colors.gray400} />
+                                    <Text style={styles.stateText}>Şu an hatta aktif araç bulunmuyor.</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    <View
+                                        style={styles.mapContainer}
+                                        onTouchStart={() => setIsScrollEnabled(false)}
+                                        onTouchEnd={() => setIsScrollEnabled(true)}
+                                        onTouchCancel={() => setIsScrollEnabled(true)}
                                     >
-                                        <View style={styles.vehicleIconBox}>
-                                            <Ionicons name="bus" size={16} color={Colors.white} />
-                                        </View>
-                                        <View style={styles.vehicleInfo}>
-                                            <Text style={styles.vehicleId}>Araç No: {bus.busId}</Text>
-                                            <Text style={styles.vehicleLocation} numberOfLines={1}>
-                                                {bus.direction ? `Yön: ${bus.direction}` : `GPS: ${bus.latitude?.toFixed(2)}, ${bus.longitude?.toFixed(2)}`}
-                                            </Text>
-                                        </View>
-                                        <View style={styles.liveBadgeSmall}>
-                                            <View style={styles.liveDot} />
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </>
-                    )}
-                </View>
+                                        <MapView
+                                            ref={mapRef}
+                                            style={styles.map}
+                                            showsCompass={true}
+                                            showsUserLocation={true}
+                                            showsMyLocationButton={true}
+                                            initialRegion={{
+                                                latitude: vehiclesState.data?.[0]?.latitude || 38.4237,
+                                                longitude: vehiclesState.data?.[0]?.longitude || 27.1428,
+                                                latitudeDelta: 0.05,
+                                                longitudeDelta: 0.05,
+                                            }}
+                                        >
+                                            {vehiclesState.data?.map((bus, idx) => (
+                                                <Marker
+                                                    key={`bus-${bus.busId}-${idx}`}
+                                                    coordinate={{ latitude: bus.latitude as number, longitude: bus.longitude as number }}
+                                                    onPress={() => {
+                                                        mapRef.current?.animateToRegion({
+                                                            latitude: bus.latitude as number,
+                                                            longitude: bus.longitude as number,
+                                                            latitudeDelta: 0.005,
+                                                            longitudeDelta: 0.005
+                                                        }, 400);
+                                                    }}
+                                                >
+                                                    <View style={styles.busMarker}>
+                                                        <Ionicons name="bus" size={16} color={Colors.white} />
+                                                    </View>
+                                                    <Callout tooltip>
+                                                        <View style={styles.calloutContainer}>
+                                                            <Text style={styles.calloutTitle}>Araç No: {bus.busId}</Text>
+                                                            {bus.direction && <Text style={styles.calloutSubtitle}>Yön: {bus.direction}</Text>}
+                                                        </View>
+                                                    </Callout>
+                                                </Marker>
+                                            ))}
+                                        </MapView>
+                                    </View>
 
-                {/* GÜZERGAH */}
-                <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Hat Güzergahı</Text>
+                                    {/* AKTİF ARAÇLARIN LİSTE (KART) GÖRÜNÜMÜ - Yatay Scroll UI/UX */}
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.vehiclesListHorizontal}
+                                    >
+                                        {vehiclesState.data?.map((bus, idx) => (
+                                            <TouchableOpacity
+                                                key={`bus-card-${bus.busId}-${idx}`}
+                                                style={styles.vehicleCardHorizontal}
+                                                onPress={() => handleVehiclePress(bus)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={styles.vehicleIconBox}>
+                                                    <Ionicons name="bus" size={16} color={Colors.white} />
+                                                </View>
+                                                <View style={styles.vehicleInfo}>
+                                                    <Text style={styles.vehicleId}>Araç No: {bus.busId}</Text>
+                                                    <Text style={styles.vehicleLocation} numberOfLines={1}>
+                                                        {bus.direction ? `Yön: ${bus.direction}` : `GPS: ${bus.latitude?.toFixed(2)}, ${bus.longitude?.toFixed(2)}`}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.liveBadgeSmall}>
+                                                    <View style={styles.liveDot} />
+                                                </View>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </>
+                            )}
+                        </View>
 
-                    <View style={styles.timeline}>
-                        {routeStops.map((stop, index) => {
-                            const isFirst = index === 0;
-                            const isLast = index === routeStops.length - 1;
+                        {/* GÜZERGAH BAŞLIĞI */}
+                        <View style={[styles.sectionContainer, { paddingBottom: Spacing.md }]}>
+                            <Text style={styles.sectionTitle}>Hat Güzergahı</Text>
+                        </View>
+                    </>
+                }
+                renderItem={({ item: stop, index }) => {
+                    const isFirst = index === 0;
+                    const isLast = index === routeStops.length - 1;
 
-                            return (
+                    return (
+                        <View style={{ paddingHorizontal: Spacing.base }}>
+                            <View style={{ paddingLeft: Spacing.sm }}>
                                 <TouchableOpacity
-                                    key={`route-stop-${stop.id}-${index}`}
                                     style={styles.timelineItem}
                                     onPress={() => router.push(`/stop/${stop.id}`)}
                                 >
@@ -291,11 +332,11 @@ export default function RouteDetailScreen() {
                                         <Ionicons name="chevron-forward" size={16} color={Colors.gray200} />
                                     </View>
                                 </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-            </ScrollView >
+                            </View>
+                        </View>
+                    );
+                }}
+            />
         </View >
     );
 }
@@ -430,19 +471,22 @@ const styles = StyleSheet.create({
     },
     mapContainer: {
         height: 300,
-        borderRadius: BorderRadius.xl,
-        overflow: 'hidden',
-        borderWidth: 1,
+        width: '100%',
+        marginVertical: Spacing.sm,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
         borderColor: Colors.gray200,
-        marginBottom: Spacing.base,
     },
     map: {
         ...StyleSheet.absoluteFillObject,
     },
     busMarker: {
         backgroundColor: Colors.primary,
-        padding: 6,
-        borderRadius: 20,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
         borderWidth: 2,
         borderColor: Colors.white,
         ...Shadows.sm,

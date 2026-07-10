@@ -140,7 +140,7 @@ export const getApproachingBuses = async (stopId: string | number): Promise<Appr
 
     return data.map(normalizeApproachingBus);
   } catch (error) {
-    console.error(`Durak ${stopId} için araçlar getirilirken hata:`, error);
+    console.warn(`Durak ${stopId} için araçlar getirilirken hata:`, error);
     throw error;
   }
 };
@@ -178,7 +178,7 @@ export const getRouteVehicles = async (routeNumber: string | number): Promise<Ap
 
     return Array.from(uniqueVehiclesMap.values());
   } catch (error) {
-    console.error(`Hat ${routeNumber} için aktif araçlar yüklenemedi:`, error);
+    console.warn(`Hat ${routeNumber} için aktif araçlar yüklenemedi:`, error);
     throw error;
   }
 };

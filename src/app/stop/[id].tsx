@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Callout, Marker } from 'react-native-maps';
 
 export default function StopDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,7 +25,9 @@ export default function StopDetailScreen() {
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [refreshCountdown, setRefreshCountdown] = useState(0);
+    const [isScrollEnabled, setIsScrollEnabled] = useState(true);
     const isFetchingRef = useRef(false);
+    const mapRef = useRef<MapView>(null);
 
     // 15 Saniyelik Geri Sayım (Cooldown) Efekti
     useEffect(() => {
@@ -53,7 +56,7 @@ export default function StopDetailScreen() {
             setRefreshCountdown(15);
         }
 
-        setApiState({ isLoading: true, isSuccess: false, isEmpty: false, errorMessage: null, data: [] });
+        setApiState(prev => ({ isLoading: true, isSuccess: false, isEmpty: false, errorMessage: null, data: prev.data }));
 
         getApproachingBuses(id)
             .then(buses => {
@@ -92,9 +95,15 @@ export default function StopDetailScreen() {
 
     useEffect(() => {
         if (stop) {
-            fetchBuses();
+            fetchBuses(true); // Ekrana girildiğinde ilk çağrıyı oto yenileme say
+            const interval = setInterval(() => {
+                fetchBuses(true);
+            }, 60000); // 60 Saniyede bir arka planda yenile (Cooldown'ı tetiklemez)
+            return () => clearInterval(interval);
         }
     }, [stop]);
+
+    // Kullanıcının isteği üzerine otomatik odaklama (fitToCoordinates) kaldırıldı.
 
     if (isLoadingStop) {
         return (
@@ -137,6 +146,7 @@ export default function StopDetailScreen() {
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                scrollEnabled={isScrollEnabled}
             >
                 {/* Meta Bilgiler ve Favoriye Ekleme */}
                 <View style={styles.metadataCard}>
@@ -160,6 +170,97 @@ export default function StopDetailScreen() {
                                 color={isFavorite ? Colors.accent : Colors.gray400}
                             />
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Durak ve Yaklaşan Otobüsler Haritası */}
+                <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionTitle}>Harita Görünümü</Text>
+                    <View
+                        style={styles.mapContainer}
+                        onTouchStart={() => setIsScrollEnabled(false)}
+                        onTouchEnd={() => setIsScrollEnabled(true)}
+                        onTouchCancel={() => setIsScrollEnabled(true)}
+                    >
+                        <MapView
+                            ref={mapRef}
+                            style={styles.map}
+                            showsCompass={true}
+                            showsUserLocation={true}
+                            showsMyLocationButton={true}
+                            initialRegion={{
+                                latitude: stop.latitude !== 0 ? stop.latitude : 38.4237,
+                                longitude: stop.longitude !== 0 ? stop.longitude : 27.1428,
+                                latitudeDelta: 0.015,
+                                longitudeDelta: 0.015,
+                            }}
+                        >
+                            {/* Durağın Kendi Konumu */}
+                            {stop.latitude !== 0 && (
+                                <Marker
+                                    key={`stop-marker-main-${stop.id}`}
+                                    coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                                    zIndex={999}
+                                    onPress={() => {
+                                        mapRef.current?.animateToRegion({
+                                            latitude: stop.latitude,
+                                            longitude: stop.longitude,
+                                            latitudeDelta: 0.005,
+                                            longitudeDelta: 0.005
+                                        }, 400);
+                                    }}
+                                >
+                                    <View style={[styles.busMarker, { backgroundColor: Colors.accent }]}>
+                                        <Ionicons name="location" size={16} color={Colors.white} />
+                                    </View>
+                                    <Callout tooltip>
+                                        <View style={styles.calloutContainer}>
+                                            <Text style={styles.calloutTitle}>{stop.name}</Text>
+                                            <Text style={styles.calloutSubtitle}>Durak Konumu</Text>
+                                        </View>
+                                    </Callout>
+                                </Marker>
+                            )}
+
+                            {/* Yaklaşan Otobüsler (Koordinatı Olanlar) */}
+                            {apiState.data?.map((bus, idx) => {
+                                if (!bus.latitude || !bus.longitude) return null;
+
+                                // Araçlar terminalde veya aynı yerde bekleme yapıyorsa üst üste binmesin diye hafif offset
+                                const offsetLat = (idx % 3 === 0 ? 0.00005 : (idx % 3 === 1 ? -0.00005 : 0)) * idx;
+                                const offsetLon = (idx % 2 === 0 ? 0.00005 : -0.00005) * idx;
+                                const finalLat = bus.latitude + offsetLat;
+                                const finalLon = bus.longitude + offsetLon;
+
+                                return (
+                                    <Marker
+                                        key={`bus-marker-${bus.busId}-${idx}`}
+                                        coordinate={{ latitude: finalLat, longitude: finalLon }}
+                                        onPress={() => {
+                                            mapRef.current?.animateToRegion({
+                                                latitude: finalLat,
+                                                longitude: finalLon,
+                                                latitudeDelta: 0.005,
+                                                longitudeDelta: 0.005
+                                            }, 400);
+                                        }}
+                                    >
+                                        <View style={styles.busMarker}>
+                                            <Ionicons name="bus" size={14} color={Colors.white} />
+                                        </View>
+                                        <Callout tooltip>
+                                            <View style={styles.calloutContainer}>
+                                                <Text style={styles.calloutTitle} numberOfLines={1}>Hat {bus.routeNumber}</Text>
+                                                <Text style={styles.calloutSubtitle} numberOfLines={1}>Araç No: {bus.busId}</Text>
+                                                {bus.remainingStopCount !== null && (
+                                                    <Text style={styles.calloutSubtitle} numberOfLines={1}>Kalan: {bus.remainingStopCount}</Text>
+                                                )}
+                                            </View>
+                                        </Callout>
+                                    </Marker>
+                                );
+                            })}
+                        </MapView>
                     </View>
                 </View>
 
@@ -398,5 +499,50 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: FontSizes.sm,
         color: Colors.textSecondary,
+    },
+    mapContainer: {
+        height: 250,
+        width: '100%',
+        marginVertical: Spacing.sm,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    map: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    busMarker: {
+        backgroundColor: Colors.primary,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: Colors.white,
+    },
+    calloutContainer: {
+        minWidth: 140,
+        backgroundColor: Colors.white,
+        padding: Spacing.sm,
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    calloutTitle: {
+        fontSize: FontSizes.sm,
+        fontWeight: FontWeights.bold,
+        color: Colors.textPrimary,
+        marginBottom: 2,
+        textAlign: 'center',
+        width: '100%',
+    },
+    calloutSubtitle: {
+        fontSize: FontSizes.xs,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        width: '100%',
     },
 });

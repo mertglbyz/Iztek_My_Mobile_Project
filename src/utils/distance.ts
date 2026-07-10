@@ -43,6 +43,7 @@ export function getSortedStopsByDistance(
     userLocation: UserLocation
 ): BusStopWithDistance[] {
     return stops
+        .filter((stop) => stop.latitude && stop.longitude && stop.latitude !== 0 && stop.longitude !== 0)
         .map((stop) => ({
             ...stop,
             distanceMeters: calculateDistance(
