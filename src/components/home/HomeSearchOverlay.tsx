@@ -1,8 +1,9 @@
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
+import { getAllRoutes } from '@/services/transportApi';
 import { BusRouteSummary, BusStop, BusStopWithDistance } from '@/types';
 import { getRoutesFromStops } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface SearchResult {
@@ -25,16 +26,24 @@ export default function HomeSearchOverlay({
     onPressStop,
     allStops,
 }: HomeSearchOverlayProps) {
+    const [routeNames, setRouteNames] = useState<{ id: string, name: string }[]>([]);
+
+    useEffect(() => {
+        getAllRoutes().then(setRouteNames).catch(console.warn);
+    }, []);
 
     const results = useMemo(() => {
         if (!searchQuery.trim() || searchQuery.length < 2) return [];
 
+        // Türkçe karakterleri de destekleyen küçültme
         const q = searchQuery.toLocaleLowerCase('tr-TR').trim();
-        const dynamicRoutes = getRoutesFromStops(allStops);
+        const dynamicRoutes = getRoutesFromStops(allStops, routeNames);
 
-        const foundRoutes = dynamicRoutes.filter(
-            (r) => r.routeNumber.toString().includes(q)
-        ).map((r) => ({ type: 'route' as const, item: r }));
+        const foundRoutes = dynamicRoutes.filter((r) => {
+            if (r.routeNumber.toString().includes(q)) return true;
+            if (r.routeName && r.routeName.toLocaleLowerCase('tr-TR').includes(q)) return true;
+            return false;
+        }).map((r) => ({ type: 'route' as const, item: r }));
 
         const foundStops = allStops.filter(s => {
             if (s.name.toLocaleLowerCase('tr-TR').includes(q)) return true;
@@ -83,7 +92,9 @@ export default function HomeSearchOverlay({
                                             <Ionicons name="bus" size={16} color={Colors.white} />
                                         </View>
                                         <View style={styles.itemInfo}>
-                                            <Text style={styles.itemTitle}>Hat {route.routeNumber}</Text>
+                                            <Text style={styles.itemTitle}>
+                                                {route.routeName ? `${route.routeNumber} - ${route.routeName}` : `Hat ${route.routeNumber}`}
+                                            </Text>
                                             <Text style={styles.itemSubtitle}>{route.stopCount} duraktan geçiyor</Text>
                                         </View>
                                         <Ionicons name="chevron-forward" size={16} color={Colors.gray400} />

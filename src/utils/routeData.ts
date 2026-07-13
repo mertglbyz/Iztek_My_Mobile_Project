@@ -4,7 +4,7 @@ import { BusRouteSummary, BusStop } from '@/types';
  * Mevcut durak verilerinden (routes alanı array olan) benzersiz (unique) hat listesi üretir.
  * Mühendisin maildeki isteği üzerine, elimizdeki durakları tarayarak "Tersine Mühendislik (Reverse Mapping)" yapılır.
  */
-export const getRoutesFromStops = (stops: BusStop[]): BusRouteSummary[] => {
+export const getRoutesFromStops = (stops: BusStop[], routeNamesData?: { id: string, name: string }[]): BusRouteSummary[] => {
     const routeMap = new Map<number, number>(); // Map<Route Numarası, Durak Sayısı>
 
     // 1. Tüm durakları tek tek dön
@@ -24,10 +24,14 @@ export const getRoutesFromStops = (stops: BusStop[]): BusRouteSummary[] => {
     });
 
     // 4. Map yapısını istenen modele (BusRouteSummary dizisine) dönüştür
-    const routesArray: BusRouteSummary[] = Array.from(routeMap.entries()).map(([routeNumber, stopCount]) => ({
-        routeNumber,
-        stopCount
-    }));
+    const routesArray: BusRouteSummary[] = Array.from(routeMap.entries()).map(([routeNumber, stopCount]) => {
+        const foundName = routeNamesData?.find(r => String(r.id) === String(routeNumber))?.name;
+        return {
+            routeNumber,
+            stopCount,
+            routeName: foundName || `Hat ${routeNumber}`
+        };
+    });
 
     // 5. Hatları küçükten büyüğe sırala
     routesArray.sort((a, b) => a.routeNumber - b.routeNumber);

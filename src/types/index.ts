@@ -26,6 +26,7 @@ export interface BusRoute {
 export type BusRouteSummary = {
   routeNumber: number;
   stopCount: number;
+  routeName?: string;
 };
 
 /** Durağa yaklaşan otobüs (API Veri Modeli) */

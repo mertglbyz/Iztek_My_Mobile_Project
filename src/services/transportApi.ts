@@ -5,8 +5,10 @@
  * Uygulamanın dış kaynaklarla (API ve JSON) olan bağlantısını güvence altında tutar.
  */
 
+import routesJson from '@/data/routes.json';
 import stopsJson from '@/data/stops.json';
 import { ApproachingBus, BusStop } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================
 // HELPER FONKSİYONLAR
@@ -180,5 +182,75 @@ export const getRouteVehicles = async (routeNumber: string | number): Promise<Ap
   } catch (error) {
     console.warn(`Hat ${routeNumber} için aktif araçlar yüklenemedi:`, error);
     throw error;
+  }
+};
+
+// ============================
+// HAT İSİMLENDİRME (HYBRID SYNC)
+// ============================
+
+const ROUTES_CACHE_KEY = '@eshot_routes_cache';
+let memCachedRoutes: { id: string; name: string }[] | null = null;
+
+/** 
+ * Hatların isimlerini ve ID'lerini döner.
+ * Önce RAM'e (memCachedRoutes), sonra Local Storage'a, o da yoksa gömülü routes.json'a bakar.
+ */
+export const getAllRoutes = async (): Promise<{ id: string; name: string }[]> => {
+  if (memCachedRoutes) return memCachedRoutes;
+
+  try {
+    const cachedString = await AsyncStorage.getItem(ROUTES_CACHE_KEY);
+    if (cachedString) {
+      memCachedRoutes = JSON.parse(cachedString);
+      return memCachedRoutes!;
+    }
+  } catch (err) {
+    console.warn("AsyncStorage route cache okunamadı:", err);
+  }
+
+  // AsyncStorage boşsa lokal JSON'ı kullan
+  memCachedRoutes = routesJson as { id: string; name: string }[];
+  return memCachedRoutes;
+};
+
+/**
+ * Spesifik bir hattın ismini bulur
+ */
+export const getRouteName = async (routeId: string | number): Promise<string> => {
+  const routes = await getAllRoutes();
+  const route = routes.find(r => String(r.id) === String(routeId));
+  return route ? route.name : `Hat ${routeId}`;
+};
+
+/**
+ * Arka planda sessizce çalışıp yeni/farklı hat isimlerini sunucudan (veya CSV url vs) çekip Local Storage'a yazar.
+ * (Gerçek API URL'si buraya eklenecektir, şimdilik mockup niteliğinde CKAN veya statik bir check konulabilir)
+ */
+export const syncRouteNamesInBackground = async () => {
+  try {
+    // Burada ileride direkt olarak ESHOT Hat Listesi API'si çağrılacak. ESHOT CKAN Datastore request:
+    const response = await fetch('https://openfiles.izmir.bel.tr/211488/docs/eshot-otobus-hatlari.csv');
+    if (!response.ok) return;
+
+    const text = await response.text();
+    const lines = text.split('\n');
+    const data: { id: string; name: string }[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const parts = line.split(';');
+      if (parts.length >= 2) {
+        data.push({ id: parts[0].trim(), name: parts[1].trim() });
+      }
+    }
+
+    if (data.length > 0) {
+      await AsyncStorage.setItem(ROUTES_CACHE_KEY, JSON.stringify(data));
+      memCachedRoutes = data; // RAM cache'i de tazele
+    }
+  } catch (error) {
+    // Sessizce başarısız ol. Offline mode (JSON) olduğu için UX zarar görmez.
   }
 };

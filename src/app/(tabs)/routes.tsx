@@ -2,27 +2,39 @@ import ScreenHeader from '@/components/common/ScreenHeader';
 import FavoriteListItem from '@/components/home/FavoriteListItem';
 import { BorderRadius, Colors, FontSizes, FontWeights, Spacing } from '@/constants/theme';
 import { useStops } from '@/context/StopsContext';
+import { getAllRoutes } from '@/services/transportApi';
 import { getRoutesFromStops } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { FlatList, Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { FlatList, Keyboard, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function RoutesScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const { stops } = useStops();
+    const [routeNames, setRouteNames] = useState<{ id: string, name: string }[]>([]);
+
+    // Asenkron olarak hat isimlerini önbellekten veya lokal JSON'dan yükle
+    useEffect(() => {
+        getAllRoutes().then(setRouteNames).catch(console.warn);
+    }, []);
 
     // Mevcut durak verilerinden dinamik olarak gerçek hat dizisini (routes array) üret
-    const dynamicRoutes = useMemo(() => getRoutesFromStops(stops), [stops]);
+    const dynamicRoutes = useMemo(() => getRoutesFromStops(stops, routeNames), [stops, routeNames]);
 
     // Arama fonksiyonu: string bazlı filtreleme ve performans için max 50 sonuç
     const filteredRoutes = useMemo(() => {
-        const q = searchQuery.toLowerCase().trim();
+        // Türkçe karakterleri destekleyen küçültme
+        const q = searchQuery.toLocaleLowerCase('tr-TR').trim();
         // Arama yapılmamışsa tüm hatları göster (FlatList sanallaştırmasıyla performansı yönetir)
         if (!q) return dynamicRoutes;
 
         return dynamicRoutes.filter(
-            (route) => route.routeNumber.toString().includes(q)
+            (route) => {
+                if (route.routeNumber.toString().includes(q)) return true;
+                if (route.routeName && route.routeName.toLocaleLowerCase('tr-TR').includes(q)) return true;
+                return false;
+            }
         ).slice(0, 50);
     }, [searchQuery, dynamicRoutes]);
 
@@ -39,11 +51,16 @@ export default function RoutesScreen() {
                     <Ionicons name="search-outline" size={20} color={Colors.gray500} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Hat numarası ara (Örn: 304)..."
+                        placeholder="Hat numarası veya adı ara..."
                         placeholderTextColor={Colors.textDisabled}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                     />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <Ionicons name="close-circle" size={20} color={Colors.gray400} />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.statsRow}>
@@ -80,7 +97,7 @@ export default function RoutesScreen() {
                         <FavoriteListItem
                             variant="route"
                             badgeText={route.routeNumber.toString()}
-                            title={`Hat ${route.routeNumber}`}
+                            title={route.routeName || `Hat ${route.routeNumber}`}
                             subtitle={`${route.stopCount} duraktan geçiyor`}
                             onPress={() => {
                                 Keyboard.dismiss();

@@ -2,7 +2,7 @@ import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useStops } from '@/context/StopsContext';
-import { getRouteVehicles } from '@/services/transportApi';
+import { getRouteName, getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,9 +17,14 @@ export default function RouteDetailScreen() {
     const insets = useSafeAreaInsets();
     const { stops: allStops } = useStops();
     const { addFavoriteRoute, removeFavoriteRoute, isFavoriteRoute } = useFavorites();
+    const [routeName, setRouteName] = useState<string>('');
 
     // Mock sistemi kaldırıldığı için dinamik olarak bu hattan geçen durakları bul
     const routeStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
+
+    useEffect(() => {
+        getRouteName(id).then(name => setRouteName(name)).catch(console.warn);
+    }, [id]);
 
     // Canlı Araçlar State Yönetimi
     const [vehiclesState, setVehiclesState] = useState<ApiResponseState<ApproachingBus[]>>({
@@ -142,7 +147,7 @@ export default function RouteDetailScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.headerTitleContainer}>
-                    <Text style={styles.headerRouteNumber}>{id}</Text>
+                    <Text style={styles.headerRouteNumber}>{routeName ? `${id} - ${routeName}` : id}</Text>
                 </View>
 
                 <TouchableOpacity onPress={handleToggleFavorite} style={styles.iconButton}>
@@ -162,7 +167,7 @@ export default function RouteDetailScreen() {
 
                         {/* HAT BİLGİSİ */}
                         <View style={styles.infoCard}>
-                            <Text style={styles.routeTitle}>Hat {id}</Text>
+                            <Text style={styles.routeTitle}>{routeName ? `Hat ${id} - ${routeName}` : `Hat ${id}`}</Text>
                             <View style={styles.timeRow}>
                                 <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
                                 <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
