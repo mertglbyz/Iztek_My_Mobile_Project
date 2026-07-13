@@ -2,6 +2,7 @@ import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useStops } from '@/context/StopsContext';
+import routePolylinesRaw from '@/data/route_polylines.json';
 import { getRouteName, getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
@@ -9,8 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Callout, Marker } from 'react-native-maps';
+import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+const routePolylines: Record<string, { "1"?: number[][], "2"?: number[][] }> = routePolylinesRaw as any;
 
 export default function RouteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>(); // Tıklanan Hat Numarası
@@ -21,6 +23,15 @@ export default function RouteDetailScreen() {
 
     // Mock sistemi kaldırıldığı için dinamik olarak bu hattan geçen durakları bul
     const routeStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
+
+    // Polyline verilerini harita için hazırla (Yön 1 ve Yön 2 ayrı poliçizgi dizileri)
+    const routeCoords = useMemo(() => {
+        const polyData = routePolylines[id];
+        if (!polyData) return [];
+        const line1 = (polyData["1"] || []).map(p => ({ latitude: p[0], longitude: p[1] }));
+        const line2 = (polyData["2"] || []).map(p => ({ latitude: p[0], longitude: p[1] }));
+        return [line1, line2].filter(line => line.length > 0);
+    }, [id]);
 
     useEffect(() => {
         getRouteName(id).then(name => setRouteName(name)).catch(console.warn);
@@ -162,6 +173,10 @@ export default function RouteDetailScreen() {
                 contentContainerStyle={{ paddingBottom: Spacing.xxxl }}
                 showsVerticalScrollIndicator={false}
                 scrollEnabled={isScrollEnabled}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
                 ListHeaderComponent={
                     <>
 
@@ -210,23 +225,23 @@ export default function RouteDetailScreen() {
                                 </Text>
                             )}
 
-                            {vehiclesState.isLoading && !vehiclesState.data?.length ? (
+                            {vehiclesState.isLoading && !vehiclesState.data?.length && routeCoords.length === 0 ? (
                                 <View style={styles.stateCard}>
                                     <Ionicons name="bus-outline" size={32} color={Colors.gray400} />
                                     <Text style={styles.stateText}>Araç konumları aranıyor...</Text>
                                 </View>
-                            ) : vehiclesState.errorMessage ? (
+                            ) : vehiclesState.errorMessage && routeCoords.length === 0 ? (
                                 <View style={[styles.stateCard, { borderColor: Colors.error }]}>
                                     <Ionicons name="warning-outline" size={32} color={Colors.error} />
                                     <Text style={[styles.stateText, { color: Colors.error }]}>{vehiclesState.errorMessage}</Text>
                                 </View>
-                            ) : vehiclesState.isEmpty ? (
-                                <View style={styles.stateCard}>
-                                    <Ionicons name="moon-outline" size={32} color={Colors.gray400} />
-                                    <Text style={styles.stateText}>Şu an hatta aktif araç bulunmuyor.</Text>
-                                </View>
                             ) : (
                                 <>
+                                    {vehiclesState.isEmpty && (
+                                        <Text style={[styles.lastUpdateText, { color: Colors.gray400, marginTop: -Spacing.xs, marginBottom: Spacing.sm }]}>
+                                            Şu an hatta aktif araç bulunmuyor, ancak güzergah haritada gösterilmektedir.
+                                        </Text>
+                                    )}
                                     <View
                                         style={styles.mapContainer}
                                         onTouchStart={() => setIsScrollEnabled(false)}
@@ -240,12 +255,20 @@ export default function RouteDetailScreen() {
                                             showsUserLocation={true}
                                             showsMyLocationButton={true}
                                             initialRegion={{
-                                                latitude: vehiclesState.data?.[0]?.latitude || 38.4237,
-                                                longitude: vehiclesState.data?.[0]?.longitude || 27.1428,
+                                                latitude: vehiclesState.data?.[0]?.latitude || routeCoords[0]?.[0]?.latitude || 38.4237,
+                                                longitude: vehiclesState.data?.[0]?.longitude || routeCoords[0]?.[0]?.longitude || 27.1428,
                                                 latitudeDelta: 0.05,
                                                 longitudeDelta: 0.05,
                                             }}
                                         >
+                                            {routeCoords.map((line, idx) => (
+                                                <Polyline
+                                                    key={`route-line-${idx}`}
+                                                    coordinates={line}
+                                                    strokeColor={idx === 0 ? Colors.primaryDark : Colors.error}
+                                                    strokeWidth={3}
+                                                />
+                                            ))}
                                             {vehiclesState.data?.map((bus, idx) => (
                                                 <Marker
                                                     key={`bus-${bus.busId}-${idx}`}

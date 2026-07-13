@@ -80,6 +80,10 @@ export default function HomeSearchOverlay({
                         keyExtractor={(res, i) => `${res.type}-${res.type === 'route' ? res.item.routeNumber : res.item.id}-${i}`}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        initialNumToRender={10}
+                        maxToRenderPerBatch={10}
+                        windowSize={5}
+                        removeClippedSubviews={true}
                         renderItem={({ item: res }) => {
                             if (res.type === 'route') {
                                 const route = res.item as BusRouteSummary;
