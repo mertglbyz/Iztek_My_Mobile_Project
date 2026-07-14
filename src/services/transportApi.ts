@@ -5,9 +5,12 @@
  * Uygulamanın dış kaynaklarla (API ve JSON) olan bağlantısını güvence altında tutar.
  */
 
+import routeDeparturesRaw from '@/data/gtfs/route_departures.json';
+import serviceCalendarRaw from '@/data/gtfs/service_calendar.json';
 import routesJson from '@/data/routes.json';
 import stopsJson from '@/data/stops.json';
 import { ApproachingBus, BusStop } from '@/types';
+import { globalVehicleTracker } from '@/utils/vehicleTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================
@@ -41,12 +44,25 @@ export const normalizeStop = (rawStop: any): BusStop => {
 };
 
 export const normalizeApproachingBus = (rawBus: any): ApproachingBus => {
+  // `duragayaklasanotobusler` API'si genelde 1 (Gidiş) ve 2 (Dönüş) döner.
+  let dirText = 'Bilinmiyor';
+  if (rawBus.HattinYonu === 1 || rawBus.HattinYonu === '1') dirText = 'Gidiş';
+  if (rawBus.HattinYonu === 2 || rawBus.HattinYonu === '2') dirText = 'Dönüş';
+
+  const busId = rawBus.OtobusId ? String(rawBus.OtobusId) : '0';
+
+  // GLOBAL VEKTÖR OVERRIDE: Araç detay sayfasında hareketi izlenerek "Gerçek Yönü" 
+  // bilimsel kanıtlanmış bir araç varsa (trueDir); ESHOT'un verisini Durak detayda da ezip doğru yönü bas!
+  if (globalVehicleTracker[busId]?.trueDir) {
+    dirText = globalVehicleTracker[busId].trueDir!;
+  }
+
   return {
-    busId: rawBus.OtobusId ? String(rawBus.OtobusId) : '0',
+    busId,
     routeNumber: rawBus.HatNumarasi ? String(rawBus.HatNumarasi) : '?',
     routeName: rawBus.HatAdi ? String(rawBus.HatAdi) : 'Bilinmeyen Hat',
     remainingStopCount: rawBus.KalanDurakSayisi !== null && rawBus.KalanDurakSayisi !== undefined ? Number(rawBus.KalanDurakSayisi) : null,
-    direction: rawBus.HattinYonu !== null && rawBus.HattinYonu !== undefined ? String(rawBus.HattinYonu) : null,
+    direction: dirText,
     latitude: parseCoordinate(rawBus.KoorX),
     longitude: parseCoordinate(rawBus.KoorY),
     isAccessible: Boolean(rawBus.EngelliMi),
@@ -56,12 +72,17 @@ export const normalizeApproachingBus = (rawBus: any): ApproachingBus => {
 
 /** Hat Lokasyon API'sinden gelen farklı field yapıları için özel dönüştürücü */
 export const normalizeRouteVehicle = (rawVehicle: any): ApproachingBus => {
+  // `hatotobuskonumlari` API'si genelde 1 (Gidiş) ve 0 (Dönüş) döner.
+  let dirText = 'Bilinmiyor';
+  if (rawVehicle.Yon === 1 || rawVehicle.Yon === '1') dirText = 'Gidiş';
+  if (rawVehicle.Yon === 0 || rawVehicle.Yon === '0') dirText = 'Dönüş';
+
   return {
     busId: rawVehicle.OtobusId ? String(rawVehicle.OtobusId) : '0',
     routeNumber: rawVehicle.HatNumarasi ? String(rawVehicle.HatNumarasi) : '?',
     routeName: '', // Konum API'sinden ad dönmeyebiliyor
     remainingStopCount: null, // Duraksal bir tahmin yok, sadece GPS var
-    direction: rawVehicle.Yon !== undefined ? String(rawVehicle.Yon) : null,
+    direction: dirText,
     latitude: parseCoordinate(rawVehicle.KoorX),
     longitude: parseCoordinate(rawVehicle.KoorY),
     isAccessible: false,
@@ -253,4 +274,55 @@ export const syncRouteNamesInBackground = async () => {
   } catch (error) {
     // Sessizce başarısız ol. Offline mode (JSON) olduğu için UX zarar görmez.
   }
+};
+
+// ============================
+// MADDE 7: SEFER SAATLERİ
+// ============================
+
+/**
+ * 1. Hafta İçi, Cumartesi ve Pazar için geçerli Service ID'lerini gruplar.
+ */
+export const getServiceIdsByDayType = () => {
+  const calendar: Record<string, any> = serviceCalendarRaw as any;
+  const groups: Record<string, string[]> = { weekday: [], saturday: [], sunday: [] };
+
+  Object.values(calendar).forEach(s => {
+    if (s.monday === '1' && s.saturday === '0' && s.sunday === '0') groups.weekday.push(s.service_id);
+    else if (s.saturday === '1' && s.monday === '0') groups.saturday.push(s.service_id);
+    else if (s.sunday === '1' && s.monday === '0') groups.sunday.push(s.service_id);
+    // Her gün çalışan (standart haftalık) tanımlamalar varsa hepsine dahil et
+    else if (s.monday === '1' && s.saturday === '1' && s.sunday === '1') {
+      groups.weekday.push(s.service_id);
+      groups.saturday.push(s.service_id);
+      groups.sunday.push(s.service_id);
+    }
+  });
+
+  return groups;
+};
+
+/**
+ * 2. Belirtilen Hat ve Yön için Gün gruplarına göre Tüm Sefer Saatlerini getirir.
+ */
+export const getAllDepartures = (routeId: string | number, directionId: string) => {
+  const serviceGroups = getServiceIdsByDayType();
+  const departuresData: any = routeDeparturesRaw as any;
+  const routeDirData = departuresData[String(routeId)]?.[directionId];
+
+  if (!routeDirData) return { weekday: [], saturday: [], sunday: [] };
+
+  const extractTimes = (serviceIds: string[]) => {
+    const times = new Set<string>();
+    serviceIds.forEach(id => {
+      if (routeDirData[id]) routeDirData[id].forEach((t: string) => times.add(t));
+    });
+    return Array.from(times).sort();
+  };
+
+  return {
+    weekday: extractTimes(serviceGroups.weekday),
+    saturday: extractTimes(serviceGroups.saturday),
+    sunday: extractTimes(serviceGroups.sunday),
+  };
 };

@@ -1,0 +1,38 @@
+=== ??ZTEK GTFS COMPILER BA??LATILIYOR ===
+[INFO] ????leniyor: routes.txt...
+[INFO] ????leniyor: trips.txt...
+Sefer uzunluklar?? say??l??yor (En kapsay??c?? rotay?? bulmak i??in)...
+[INFO] ????leniyor: stop_times.txt...
+[INFO] ????leniyor: stops.txt...
+[INFO] ????leniyor: stop_times.txt...
+[INFO] ????leniyor: shapes.txt...
+[INFO] ????leniyor: calendar.txt...
+JSON ????kt??lar?? Yazd??r??l??yor...
+node : FATAL ERROR: Ref
+erenceError: tripsIndex
+ is not defined
+At line:1 char:1
++ node src\scripts\impo
+rtGtfs.js 2>&1 | Out-Fi
+le -Encoding ascii debu
+g_ ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (FATAL ERROR:    
+ Re... is not defin    
+ed:String) [], Rem    o
+teException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+    at runImport (C:\??
+ztek_First_Project\src\
+scripts\importGtfs.js:2
+50:77)
+    at process.processT
+icksAndRejections (node
+:internal/process/task_
+queues:105:5)

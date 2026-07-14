@@ -46,7 +46,7 @@ async function processPolylines() {
         const key = `${routeId}-${yon}`;
         const lastPt = lastPoints[key];
 
-        // Distance Thinning: Only keep point if it's > 40 meters from last kept point.
+        // Distance Thinning: Only keep point if it's > 15 meters from last kept point.
         // This dramatically reduces file size but keeps the shape accurate enough for mobile maps.
         let shouldKeep = false;
         if (!lastPt) {

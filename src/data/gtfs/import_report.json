@@ -1,0 +1,46 @@
+{
+  "executionTime": "2026-07-14T10:57:41.797Z",
+  "filesProcessed": {
+    "routes.txt": {
+      "success": true,
+      "rowCount": 427
+    },
+    "trips.txt": {
+      "success": true,
+      "rowCount": 65012
+    },
+    "stops.txt": {
+      "success": true,
+      "rowCount": 11510
+    },
+    "stop_times.txt": {
+      "success": true,
+      "rowCount": 2216478
+    },
+    "shapes.txt": {
+      "success": true,
+      "rowCount": 404229
+    },
+    "calendar.txt": {
+      "success": true,
+      "rowCount": 3
+    }
+  },
+  "stats": {
+    "routesCount": 427,
+    "representativeTripsCount": 847,
+    "totalTripsFound": 65012,
+    "gtfsStopsCount": 11510,
+    "shapePointsCount": 400840
+  },
+  "warnings": [],
+  "stopsComparison": {
+    "oldStopsCount": 11783,
+    "gtfsStopsCount": 11510,
+    "missingInGtfs": 286,
+    "newlyDiscoveredInGtfs": 13,
+    "nameMismatchCount": 3,
+    "coordMismatchCount": 18,
+    "perfectlyMatched": 11476
+  }
+}

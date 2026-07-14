@@ -24,6 +24,26 @@ export function calculateDistance(
 }
 
 /**
+ * Bir noktanın, verilen koordinat dizisindeki (Polyline) en yakın noktaya olan mesafesini (metre cinsinden) hesaplar.
+ */
+export function getDistanceToPolyline(
+    lat: number,
+    lon: number,
+    polyline: { latitude: number; longitude: number }[]
+): number {
+    if (!polyline || polyline.length === 0) return Infinity;
+
+    let minDistance = Infinity;
+    for (const point of polyline) {
+        const dist = calculateDistance(lat, lon, point.latitude, point.longitude);
+        if (dist < minDistance) {
+            minDistance = dist;
+        }
+    }
+    return minDistance;
+}
+
+/**
  * Mesafeyi kullanıcı dostu formatta gösterir
  * - 1000m altı: "250 m"
  * - 1000m üstü: "1.2 km"

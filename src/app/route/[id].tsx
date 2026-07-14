@@ -2,17 +2,24 @@ import FocusStatusBar from '@/components/common/FocusStatusBar';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useStops } from '@/context/StopsContext';
-import routePolylinesRaw from '@/data/route_polylines.json';
-import { getRouteName, getRouteVehicles } from '@/services/transportApi';
+import gtfsStopsRaw from '@/data/gtfs/gtfs_stops.json';
+import routeShapesRaw from '@/data/gtfs/route_shapes.json';
+import routeStopsRaw from '@/data/gtfs/route_stops.json';
+import { getAllDepartures, getRouteName, getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
+import { calculateDistance } from '@/utils/distance';
 import { getStopsForRoute } from '@/utils/routeData';
+import { globalVehicleTracker } from '@/utils/vehicleTracker';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-const routePolylines: Record<string, { "1"?: number[][], "2"?: number[][] }> = routePolylinesRaw as any;
+
+const routeShapes: Record<string, Record<string, number[][]>> = routeShapesRaw as any;
+const routeStopsData: Record<string, Record<string, string[]>> = routeStopsRaw as any;
+const gtfsStops: Record<string, { id: string, name: string, lat: number, lon: number }> = gtfsStopsRaw as any;
 
 export default function RouteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>(); // Tıklanan Hat Numarası
@@ -21,17 +28,48 @@ export default function RouteDetailScreen() {
     const { addFavoriteRoute, removeFavoriteRoute, isFavoriteRoute } = useFavorites();
     const [routeName, setRouteName] = useState<string>('');
 
-    // Mock sistemi kaldırıldığı için dinamik olarak bu hattan geçen durakları bul
-    const routeStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
+    // Yön 0 var mı? Yoksa Yön 1'i başlat. (Hata 1'in Kesin Çözümü)
+    const initialDir = routeStopsData[id] && !routeStopsData[id]['0'] && routeStopsData[id]['1'] ? '1' : '0';
+    const [selectedDirection, setSelectedDirection] = useState<string>(initialDir);
 
-    // Polyline verilerini harita için hazırla (Yön 1 ve Yön 2 ayrı poliçizgi dizileri)
+    // Madde 7 Gün Geliştirmesi
+    const [selectedDayType, setSelectedDayType] = useState<'weekday' | 'saturday' | 'sunday'>('weekday');
+
+    // Seçili yana göre GTFS Duraklarını getir
+    const gtfsRouteStops = useMemo(() => {
+        const directionData = routeStopsData[id]?.[selectedDirection] || [];
+        return directionData.map(stopId => gtfsStops[stopId]).filter(Boolean);
+    }, [id, selectedDirection]);
+
+    // GTFS'te hat yoksa: Eski yöntemle durakları bul (Fallback Mechanism for Missing routes like 21)
+    const fallbackStops = useMemo(() => getStopsForRoute(id, allStops), [id, allStops]);
+
+    // Nihai ekrana basılacak durak listesi
+    const routeStops = (gtfsRouteStops.length > 0 ? gtfsRouteStops : fallbackStops) as any[];
+
+    // Seçili yana ve Hatta ait (Eğer varsa) Polyline Data
     const routeCoords = useMemo(() => {
-        const polyData = routePolylines[id];
-        if (!polyData) return [];
-        const line1 = (polyData["1"] || []).map(p => ({ latitude: p[0], longitude: p[1] }));
-        const line2 = (polyData["2"] || []).map(p => ({ latitude: p[0], longitude: p[1] }));
-        return [line1, line2].filter(line => line.length > 0);
-    }, [id]);
+        const shapeData = routeShapes[id]?.[selectedDirection];
+        if (!shapeData) return [];
+        return shapeData.map(([lat, lon]) => ({ latitude: lat, longitude: lon }));
+    }, [id, selectedDirection]);
+
+    // Madde 7: Bugüne ait o yöndeki ilk hareket saatlerinin tamamı
+    const allDepartures = useMemo(() => {
+        return getAllDepartures(id, selectedDirection);
+    }, [id, selectedDirection]);
+
+    const activeDepartures = allDepartures[selectedDayType] || [];
+
+    // Yön 0 boş ise ve Yön 1 varsa sekme düzeltmesi sadece veriler geldikten sonra kontrol amaçlı
+    useEffect(() => {
+        if (routeStopsData[id]) {
+            const dirs = Object.keys(routeStopsData[id]);
+            if (dirs.length > 0 && !dirs.includes(selectedDirection)) {
+                setSelectedDirection(dirs[0]);
+            }
+        }
+    }, [id, selectedDirection]);
 
     useEffect(() => {
         getRouteName(id).then(name => setRouteName(name)).catch(console.warn);
@@ -111,10 +149,10 @@ export default function RouteDetailScreen() {
         }, 800); // 800ms yumuşak geçiş
     }, []);
 
-    // Ekrana ilk girişte ve 60 saniyede bir araçları güncelle
+    // Ekrana ilk girişte ve araçları daha sık güncelle ki Vektör (Hareket yönü) hızlı saptansın!
     useEffect(() => {
         fetchVehicles(true); // Auto-refresh sayılır
-        const interval = setInterval(() => fetchVehicles(true), 60000); // UI Perfonmansı için süre 60 saniyeye çıkarıldı
+        const interval = setInterval(() => fetchVehicles(true), 15000); // UI Perfonmansı ve Canlı Vektör için 15 saniyeye düşürüldü
         return () => clearInterval(interval);
     }, [fetchVehicles]);
 
@@ -142,10 +180,85 @@ export default function RouteDetailScreen() {
                 id,
                 routeNumber: id,
                 title: `Hat ${id}`,
-                operatingHours: `${routeStops.length} durak rotasında`
+                operatingHours: gtfsRouteStops.length > 0 ? `GTFS Entegre Rota` : `Eski Veri Sistemi`
             } as any);
         }
     };
+
+    const filteredVehicles = useMemo(() => {
+        if (!vehiclesState.data) return [];
+
+        const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
+        const stops0 = routeStopsData[id]?.[0] || [];
+
+        return vehiclesState.data.filter(bus => {
+            if (!bus.latitude || !bus.longitude) return false;
+
+            let finalDirection = String(bus.direction);
+
+            // Vektör (Hareket Yönü) Analizi: ESHOT araç takılı kalırsa gittiği yöne göre otomatik algıla
+            const history = globalVehicleTracker[bus.busId];
+
+            if (history) {
+                // Eğer en az 25m gitmişse yönüne karar ver, aksi takdirde eski kararı koru (kırmızı ışık vs)
+                const distMoved = calculateDistance(history.lat, history.lon, bus.latitude, bus.longitude);
+
+                if (distMoved > 25 && stops0.length > 0) {
+                    let oldMinDist = Infinity; let oldIndex = -1;
+                    let newMinDist = Infinity; let newIndex = -1;
+
+                    stops0.forEach((stopId, idx) => {
+                        const s = gtfsStops[stopId];
+                        if (s && s.lat) {
+                            const dOld = calculateDistance(history.lat, history.lon, s.lat, s.lon);
+                            const dNew = calculateDistance(bus.latitude as number, bus.longitude as number, s.lat, s.lon);
+                            if (dOld < oldMinDist) { oldMinDist = dOld; oldIndex = idx; }
+                            if (dNew < newMinDist) { newMinDist = dNew; newIndex = idx; }
+                        }
+                    });
+
+                    if (oldIndex !== -1 && newIndex !== -1) {
+                        let conf = history.confidence || 0;
+                        if (newIndex > oldIndex) {
+                            // İleri gidiş algılandı, skoru artır
+                            conf += 1;
+                            if (conf > 2) conf = 2; // Max limit
+                        } else if (newIndex < oldIndex) {
+                            // Geri dönüş algılandı, skoru düşür
+                            conf -= 1;
+                            if (conf < -2) conf = -2; // Min limit
+                        }
+
+                        globalVehicleTracker[bus.busId].confidence = conf;
+
+                        // Yalnızca ardışık -2 veya +2 eminliğe ulaşınca Yönü Ez! (Flicker Koruması)
+                        if (conf >= 2) {
+                            finalDirection = 'Gidiş';
+                            globalVehicleTracker[bus.busId].trueDir = 'Gidiş';
+                        } else if (conf <= -2) {
+                            finalDirection = 'Dönüş';
+                            globalVehicleTracker[bus.busId].trueDir = 'Dönüş';
+                        } else if (history.trueDir) {
+                            // Henüz tam emin değilse eski kararı koru
+                            finalDirection = history.trueDir;
+                        }
+                    }
+
+                } else if (history.trueDir) {
+                    finalDirection = history.trueDir;
+                }
+
+                // Yeni konumu güncelle (bir sonraki vektör analizi için)
+                globalVehicleTracker[bus.busId].lat = bus.latitude as number;
+                globalVehicleTracker[bus.busId].lon = bus.longitude as number;
+            } else {
+                // İlk göründüğünde ESHOT verisini kullan ve hafızaya al
+                globalVehicleTracker[bus.busId] = { lat: bus.latitude as number, lon: bus.longitude as number, trueDir: finalDirection, confidence: 0 };
+            }
+
+            return finalDirection === expectedDirStr;
+        });
+    }, [vehiclesState.data, selectedDirection, id]);
 
     return (
         <View style={styles.container}>
@@ -179,18 +292,8 @@ export default function RouteDetailScreen() {
                 removeClippedSubviews={true}
                 ListHeaderComponent={
                     <>
-
-                        {/* HAT BİLGİSİ */}
-                        <View style={styles.infoCard}>
-                            <Text style={styles.routeTitle}>{routeName ? `Hat ${id} - ${routeName}` : `Hat ${id}`}</Text>
-                            <View style={styles.timeRow}>
-                                <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
-                                <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
-                            </View>
-                        </View>
-
-                        {/* AKTİF ARAÇLAR */}
-                        <View style={styles.sectionContainer}>
+                        {/* AKTİF ARAÇLAR VE HARİTA BÖLÜMÜ (Artık Üstte) */}
+                        <View style={[styles.sectionContainer, { paddingTop: Spacing.md, paddingBottom: Spacing.md }]}>
                             <View style={styles.sectionHeader}>
                                 <Text style={styles.sectionTitle}>Aktif Araçlar</Text>
                                 <TouchableOpacity
@@ -255,21 +358,20 @@ export default function RouteDetailScreen() {
                                             showsUserLocation={true}
                                             showsMyLocationButton={true}
                                             initialRegion={{
-                                                latitude: vehiclesState.data?.[0]?.latitude || routeCoords[0]?.[0]?.latitude || 38.4237,
-                                                longitude: vehiclesState.data?.[0]?.longitude || routeCoords[0]?.[0]?.longitude || 27.1428,
+                                                latitude: filteredVehicles?.[0]?.latitude || routeCoords[0]?.latitude || 38.4237,
+                                                longitude: filteredVehicles?.[0]?.longitude || routeCoords[0]?.longitude || 27.1428,
                                                 latitudeDelta: 0.05,
                                                 longitudeDelta: 0.05,
                                             }}
                                         >
-                                            {routeCoords.map((line, idx) => (
+                                            {routeCoords.length > 0 && (
                                                 <Polyline
-                                                    key={`route-line-${idx}`}
-                                                    coordinates={line}
-                                                    strokeColor={idx === 0 ? Colors.primaryDark : Colors.error}
-                                                    strokeWidth={3}
+                                                    coordinates={routeCoords}
+                                                    strokeColor={Colors.error}
+                                                    strokeWidth={4}
                                                 />
-                                            ))}
-                                            {vehiclesState.data?.map((bus, idx) => (
+                                            )}
+                                            {filteredVehicles?.map((bus, idx) => (
                                                 <Marker
                                                     key={`bus-${bus.busId}-${idx}`}
                                                     coordinate={{ latitude: bus.latitude as number, longitude: bus.longitude as number }}
@@ -302,7 +404,7 @@ export default function RouteDetailScreen() {
                                         showsHorizontalScrollIndicator={false}
                                         contentContainerStyle={styles.vehiclesListHorizontal}
                                     >
-                                        {vehiclesState.data?.map((bus, idx) => (
+                                        {filteredVehicles?.map((bus, idx) => (
                                             <TouchableOpacity
                                                 key={`bus-card-${bus.busId}-${idx}`}
                                                 style={styles.vehicleCardHorizontal}
@@ -323,10 +425,81 @@ export default function RouteDetailScreen() {
                                                 </View>
                                             </TouchableOpacity>
                                         ))}
+                                        {filteredVehicles?.length === 0 && (
+                                            <View style={{ padding: Spacing.sm }}>
+                                                <Text style={{ color: Colors.textSecondary }}>Bu yönde aktif araç bulunmuyor.</Text>
+                                            </View>
+                                        )}
                                     </ScrollView>
                                 </>
                             )}
                         </View>
+
+                        {/* ALTTA: HAT BİLGİSİ VE SEKMELER */}
+                        <View style={[styles.infoCard, { marginTop: 0, marginBottom: Spacing.md }]}>
+                            {/* YÖN SEKMELERİ (GTFS TRIPS) SADECE GTFS DATA VARSA GÖSTER */}
+                            {routeStopsData[id] && Object.keys(routeStopsData[id]).length > 1 ? (
+                                <View style={[styles.tabsContainer, { marginTop: 0, marginBottom: Spacing.md }]}>
+                                    {Object.keys(routeStopsData[id]).sort().map(dir => (
+                                        <TouchableOpacity
+                                            key={`dir-tab-${dir}`}
+                                            style={[styles.tabButton, selectedDirection === dir && styles.tabButtonActive]}
+                                            onPress={() => setSelectedDirection(dir)}
+                                        >
+                                            <Text style={[styles.tabButtonText, selectedDirection === dir && styles.tabButtonTextActive]}>
+                                                {dir === '0' ? 'Gidiş Yönü' : dir === '1' ? 'Dönüş Yönü' : `Yön ${dir}`}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            ) : gtfsRouteStops.length === 0 ? (
+                                <View style={{ marginBottom: Spacing.sm }}>
+                                    <Text style={{ fontSize: FontSizes.sm, color: Colors.error, fontWeight: FontWeights.medium }}>
+                                        Bu hattın güncel ESHOT GTFS sisteminde durak sıralaması bulunamadı. Aşağıdaki veriler eski sisteme ait yedek verilerdir.
+                                    </Text>
+                                </View>
+                            ) : null}
+
+                            <View style={styles.timeRow}>
+                                <Ionicons name="bus-outline" size={16} color={Colors.textSecondary} />
+                                <Text style={styles.timeText}>Toplam {routeStops.length} duraktan geçiyor</Text>
+                            </View>
+                        </View>
+
+                        {/* YENİ (MADDE 7): SEFER SAATLERİ (SADECE GTFS DATA VARSA) */}
+                        {routeStopsData[id] && (allDepartures.weekday.length > 0 || allDepartures.saturday.length > 0 || allDepartures.sunday.length > 0) && (
+                            <View style={[styles.sectionContainer, { paddingBottom: Spacing.md }]}>
+                                <Text style={styles.sectionTitle}>Sefer Saatleri</Text>
+
+                                {/* GÜN TİPİ SEKMELERİ */}
+                                <View style={styles.dayTabsContainer}>
+                                    <TouchableOpacity style={[styles.dayTab, selectedDayType === 'weekday' && styles.dayTabActive]} onPress={() => setSelectedDayType('weekday')}>
+                                        <Text style={[styles.dayTabText, selectedDayType === 'weekday' && styles.dayTabTextActive]}>Hafta İçi</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.dayTab, selectedDayType === 'saturday' && styles.dayTabActive]} onPress={() => setSelectedDayType('saturday')}>
+                                        <Text style={[styles.dayTabText, selectedDayType === 'saturday' && styles.dayTabTextActive]}>Cumartesi</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.dayTab, selectedDayType === 'sunday' && styles.dayTabActive]} onPress={() => setSelectedDayType('sunday')}>
+                                        <Text style={[styles.dayTabText, selectedDayType === 'sunday' && styles.dayTabTextActive]}>Pazar</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {activeDepartures.length > 0 ? (
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.sm }} contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.xs }}>
+                                        {activeDepartures.map((time: string, idx: number) => (
+                                            <View key={`time-${idx}`} style={styles.timeBadge}>
+                                                <Ionicons name="time-outline" size={14} color={Colors.primary} style={{ marginRight: 4 }} />
+                                                <Text style={styles.timeBadgeText}>{time}</Text>
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                ) : (
+                                    <View style={{ paddingHorizontal: Spacing.md, marginTop: Spacing.sm }}>
+                                        <Text style={{ color: Colors.textSecondary }}>Bu gün tipi için sefer bilgisi bulunamadı.</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
 
                         {/* GÜZERGAH BAŞLIĞI */}
                         <View style={[styles.sectionContainer, { paddingBottom: Spacing.md }]}>
@@ -411,10 +584,52 @@ const styles = StyleSheet.create({
     headerTitleContainer: {
         flex: 1,
         alignItems: 'center',
+        paddingHorizontal: Spacing.sm,
     },
     headerRouteNumber: {
-        fontSize: FontSizes.xxl,
+        fontSize: FontSizes.xl,
         fontWeight: FontWeights.extrabold,
+        color: Colors.white,
+        textAlign: 'center',
+    },
+    timeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primarySoft,
+        paddingHorizontal: Spacing.sm,
+        paddingVertical: Spacing.xs,
+        borderRadius: BorderRadius.sm,
+        marginRight: Spacing.xs,
+    },
+    timeBadgeText: {
+        fontSize: FontSizes.sm,
+        color: Colors.textPrimary,
+        fontWeight: FontWeights.medium,
+    },
+    dayTabsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: Spacing.md,
+        marginTop: Spacing.sm,
+        gap: Spacing.sm,
+    },
+    dayTab: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: Spacing.xs,
+        borderWidth: 1,
+        borderColor: Colors.gray300,
+        borderRadius: BorderRadius.md,
+    },
+    dayTabActive: {
+        backgroundColor: Colors.primary,
+        borderColor: Colors.primary,
+    },
+    dayTabText: {
+        fontSize: FontSizes.sm,
+        color: Colors.gray700,
+        fontWeight: FontWeights.medium,
+    },
+    dayTabTextActive: {
         color: Colors.white,
     },
     scrollView: {
@@ -428,6 +643,33 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: Colors.gray200,
         ...Shadows.md,
+    },
+    tabsContainer: {
+        flexDirection: 'row',
+        marginTop: Spacing.md,
+        backgroundColor: Colors.gray100,
+        padding: 4,
+        borderRadius: BorderRadius.lg,
+    },
+    tabButton: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: BorderRadius.md,
+    },
+    tabButtonActive: {
+        backgroundColor: Colors.white,
+        ...Shadows.sm,
+    },
+    tabButtonText: {
+        fontSize: FontSizes.sm,
+        color: Colors.textSecondary,
+        fontWeight: FontWeights.medium,
+    },
+    tabButtonTextActive: {
+        color: Colors.primaryDark,
+        fontWeight: FontWeights.bold,
     },
     routeTitle: {
         fontSize: FontSizes.lg,
