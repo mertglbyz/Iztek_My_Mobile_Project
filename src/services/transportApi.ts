@@ -10,7 +10,6 @@ import serviceCalendarRaw from '@/data/gtfs/service_calendar.json';
 import routesJson from '@/data/routes.json';
 import stopsJson from '@/data/stops.json';
 import { ApproachingBus, BusStop } from '@/types';
-import { globalVehicleTracker } from '@/utils/vehicleTracker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================
@@ -51,11 +50,7 @@ export const normalizeApproachingBus = (rawBus: any): ApproachingBus => {
 
   const busId = rawBus.OtobusId ? String(rawBus.OtobusId) : '0';
 
-  // GLOBAL VEKTÖR OVERRIDE: Araç detay sayfasında hareketi izlenerek "Gerçek Yönü" 
-  // bilimsel kanıtlanmış bir araç varsa (trueDir); ESHOT'un verisini Durak detayda da ezip doğru yönü bas!
-  if (globalVehicleTracker[busId]?.trueDir) {
-    dirText = globalVehicleTracker[busId].trueDir!;
-  }
+
 
   return {
     busId,

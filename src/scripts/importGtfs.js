@@ -16,9 +16,7 @@ if (!fs.existsSync(OUT_DIR)) {
 async function parseGtfsFile(filename, onRowCallback) {
     const filePath = path.join(GTFS_DIR, filename);
     if (!fs.existsSync(filePath)) {
-        console.warn(`[UYARI] Dosya bulunamadı (Opsiyonel olabilir): ${filename}`);
-        onRowCallback({ __internal_error: 'not_found' }); // Hack pass info
-        return { success: false, rowCount: 0 };
+        return { success: false, status: 'not_found', rowCount: 0 };
     }
 
     console.log(`[INFO] İşleniyor: ${filename}...`);
@@ -82,6 +80,11 @@ async function runImport() {
     };
 
     console.log("=== İZTEK GTFS COMPILER BAŞLATILIYOR ===");
+
+    // EK DOSYA KONTROLLERİ (agency, feed_info, calendar_dates)
+    report.filesProcessed['agency.txt'] = await parseGtfsFile('agency.txt', (row) => { });
+    report.filesProcessed['feed_info.txt'] = await parseGtfsFile('feed_info.txt', (row) => { });
+    report.filesProcessed['calendar_dates.txt'] = await parseGtfsFile('calendar_dates.txt', (row) => { });
 
     // 1. ROUTES.TXT
     const routesData = {}; // { route_short_name: { id, shortName, longName, routeType } }
@@ -258,14 +261,30 @@ async function runImport() {
 
     // Yön bazlı route_shapes oluştur
     const routeShapesData = {}; // { route_short_name: { "0": [ [lat, lon] ] } }
+    let rawShapePointsCount = 0;
+    let writtenShapePointsCount = 0;
+
     Object.values(representativeTrips).forEach(rep => {
         if (rep.shapeId && shapeGroups[rep.shapeId]) {
             if (!routeShapesData[rep.routeShortName]) routeShapesData[rep.routeShortName] = {};
             // Sıralayıp compress edilmiş matrix dizilimine geçir
             const sortedShape = shapeGroups[rep.shapeId].sort((a, b) => a.seq - b.seq);
-            routeShapesData[rep.routeShortName][rep.directionId] = sortedShape.map(p => [Number(p.lat.toFixed(5)), Number(p.lon.toFixed(5))]);
+            rawShapePointsCount += sortedShape.length;
+
+            // Haversine süzgeci atıldı; Sadece ondalık yuvarlaması yaparak tüm orijinal koordinatları koru
+            const finalizedShape = sortedShape.map(p => [Number(p.lat.toFixed(5)), Number(p.lon.toFixed(5))]);
+            writtenShapePointsCount += finalizedShape.length;
+            routeShapesData[rep.routeShortName][rep.directionId] = finalizedShape;
         }
     });
+
+    report.polyLineOptimization = {
+        rawShapePointsCount,
+        writtenShapePointsCount,
+        reductionMethod: "5 Decimal Truncation (No Point Deletion)",
+        distanceThresholdMeters: 0,
+        outputFileSizeMB: 0 // Will be overwritten when saving
+    };
 
     // 6. CALENDAR dosyaları
     const serviceCalendar = {};
@@ -281,7 +300,12 @@ async function runImport() {
     console.log("JSON Çıktıları Yazdırılıyor...");
     fs.writeFileSync(path.join(OUT_DIR, 'routes.json'), JSON.stringify(routesData), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_stops.json'), JSON.stringify(routeStopsData), 'utf8');
-    fs.writeFileSync(path.join(OUT_DIR, 'route_shapes.json'), JSON.stringify(routeShapesData), 'utf8');
+
+    const shapesOutputPath = path.join(OUT_DIR, 'route_shapes.json');
+    fs.writeFileSync(shapesOutputPath, JSON.stringify(routeShapesData), 'utf8');
+    const shapesFileSizeMB = (fs.statSync(shapesOutputPath).size / 1024 / 1024).toFixed(3);
+    report.polyLineOptimization.outputFileSizeMB = `${shapesFileSizeMB} MB`;
+
     fs.writeFileSync(path.join(OUT_DIR, 'trips_index.json'), JSON.stringify(representativeTrips), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'service_calendar.json'), JSON.stringify(serviceCalendar), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_departures.json'), JSON.stringify(routeDepartures), 'utf8');

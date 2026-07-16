@@ -24,24 +24,36 @@ Geliştirme derleyicisi sonucunda yerleşik olarak üretilen çıktılar (`src/d
 - `routes.json`: Hat numarası ve ID haritalamaları.
 - `route_stops.json`: Her yön (0/1) için rotadaki durak dizilimleri.
 - `route_shapes.json`: Yönsel olarak harita geometrileri (Polylines).
+  - *Not:* Güzergâh (Shape) optimizasyonunda koordinatlar mesafe tabanlı **silinmemiş**; viraj ve kavşak çözünürlüklerini korumak için, %100 orijinal GTFS noktaları sadece 5 ondalık basamağa (yaklaşık 1.1 Metre hassasiyet) yuvarlanarak optimize edilmiştir. Eski `processPolylines.js` dosyası silinerek işlemler `importGtfs.js` içine tekelleştirilmiştir.
 - `route_departures.json`: Tüm hatların bugünkü sefer saatleri tablosu.
 - `import_report.json`: Import sürecinin rapor logları.
 
 ## GTFS ile mevcut ESHOT durak CSV’si arasındaki farklar
 Uygulamada önceden `stops.json` ismiyle duran düz liste incelenip, GTFS duraklarıyla kıyaslanmıştır:
-- Standart CSV'de 11.783 veri varken, GTFS içerisinde 10.636 durak yer almaktadır (Kullanılmayan/iptal durakların GTFS'te olmaması bir artıdır).
-- Eşleşmeyen durak ID'leri için uygulama yedek (fallback) mekanizması ile okuma yapabilmektedir.
+- Eski durak sayısı: 11.783
+- GTFS durak sayısı: 11.510
+- Eski veri setinde bulunup GTFS’te eşleşmeyen duraklar: 286
+- GTFS’te bulunup eski veri setinde eşleşmeyen duraklar: 13
+- Tam eşleşen durak: 11.476
+- İsim farkı bulunan durak: 3
+- Koordinat farkı bulunan durak: 18
 
 ## Bilinen veri sınırlamaları
 Uygulama baştan aşağı yenilenerek veri seti performansı ölçülü hale getirilmiştir:
 - Performans için sınırlandırma uygulanmıştır.
 - Rate limit riskini azaltmak için cooldown eklenmiştir.
 - Büyük veri setlerinde render yükünü azaltmak için FlatList kullanılmıştır.
-- **Stale Direction (Hatalı Yön) Kronik Sorunu:** ESHOT Canlı Araç API'sinin bazı hatlarda araçları yanlış yön etiketiyle (Ghost Bus) dondurduğunu fark ettim. Bu kronik veri kaynağı sorununu çözmek için epey uğraştım. Sisteme "Gerçek-Zamanlı GPS Vektör Takibi (Auto-Director)", "Global Memory State" ve "GPS Jitter Debouncer (Anti-Flicker Koruması)" gibi algoritmalar tasarlayarak entegre ettim. Ancak ESHOT sisteminin ping (veri gönderme) aralıklarındaki istikrarsızlık ve terminaller etrafındaki GPS sinyal yığılmaları nedeniyle tüm denemelerime rağmen verilerdeki sekme kırılmalarında kesin bir neticeye varamadım. Sorunun kaynağı ESHOT Açık Veri portalının temel mimarisine dayandığı için şimdilik çözülemeyen kronik bir limitasyon olarak projede bırakılmıştır.
-- **Eksik Kaynak Dosyalar:** ESHOT'un sağladığı mevcut GTFS ZIP arşivi incelendiğinde, entegrasyon için talep edilen `calendar_dates.txt` (özel tatil günleri seferleri) ve `feed_info.txt` (versiyon sürümü ve sağlayıcı bilgisi) veri setinde **bulunmamaktadır**. Bu eksiklik ESHOT Açık Veri Portalı kaynaklı olup uygulamanın kod kalitesiyle bağdaşmamaktadır.
+- **Eksik ve Kullanılmayan Kaynak Dosyalar:** ESHOT'un sağladığı mevcut GTFS ZIP arşivi incelendiğinde, entegrasyon için talep edilen `calendar_dates.txt` (özel tatil günleri seferleri) ve `feed_info.txt` (versiyon sürümü ve sağlayıcı bilgisi) veri setinde **bulunmamaktadır**. Ayrıca, şirket verilerini barındıran `agency.txt` dosyası okunmuş ve raporlanmış olup; tüm uygulama tek bir kuruma (ESHOT) bağlı lokal bir sistem olduğu için mobile atılacak JSON boyutlarını şişirmemek amacıyla UI tarafında kullanılmamıştır.
 
 ## Veri güncelliği notu
 ESHOT GTFS servisi bazı hatlar için anlık veya tam veri sunmayabilir. Kurulan fallback (yedek) mekanizmaları bu durumları sistem çökmeden tolere etse de, uygulamanın doğruluğu ESHOT'un sağladığı arşivin güncelliğine bağlıdır.
+
+## Sefer Saatlerinin Kapsamı ve Kısıtlamalar
+Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için şu istisnalar tamamen geçerlidir:
+- Uygulamaya yansıtılan saatler, GTFS içerisindeki `stop_times.txt` ve `calendar.txt` verisinden statik olarak üretilmektedir.
+- Ekranda gösterilen saatler rastgele bir durağın değil, aracın terminalden (hattın ilk durağından) kalktığı **hareket saatleridir**.
+- `calendar_dates.txt` veritabanı sistemde bulunmadığı/gelmediği için, yılbaşı gibi özel gün veya resmi tatillerdeki olağanüstü sefer istisnaları hesaba **katılamamaktadır**.
+- Belirtilen saatler kesinlikle **canlı araç tahmini (ETA) değildir**; resmi planlanan program listesidir.
 
 ## Sonraki faz: Nasıl Giderim / rota planlama
 Planlaması yapılan fakat henüz arayüze eklenmeyen `tripPlanner.ts` servisi yazılmıştır. Başlangıç ve varış durakları arası aktarmasız rota analiz testleri servis katmanında tamamlanmış, UI katmanına entegrasyonu bir sonraki faza bırakılmıştır.

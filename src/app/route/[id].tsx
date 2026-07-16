@@ -7,9 +7,7 @@ import routeShapesRaw from '@/data/gtfs/route_shapes.json';
 import routeStopsRaw from '@/data/gtfs/route_stops.json';
 import { getAllDepartures, getRouteName, getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
-import { calculateDistance } from '@/utils/distance';
 import { getStopsForRoute } from '@/utils/routeData';
-import { globalVehicleTracker } from '@/utils/vehicleTracker';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -86,9 +84,48 @@ export default function RouteDetailScreen() {
 
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [refreshCountdown, setRefreshCountdown] = useState(0);
-    const [isScrollEnabled, setIsScrollEnabled] = useState(true);
+    const isScrollEnabled = useState(true);
+    // Destructuring scroll hack
+    const isScrollEnabledVal = isScrollEnabled[0];
+    const setIsScrollEnabled = isScrollEnabled[1];
+
     const isFetchingRef = useRef(false);
     const mapRef = useRef<MapView>(null); // Harita kontrolü için Referans
+    const timeListRef = useRef<FlatList>(null);
+
+    const [nextDepartureIndex, setNextDepartureIndex] = useState<number>(-1);
+
+    // Otomatik odaklama (Auto-Scroll) - Sefer Saatleri İçin
+    useEffect(() => {
+        if (activeDepartures.length === 0) {
+            setNextDepartureIndex(-1);
+            return;
+        }
+        const now = new Date();
+        const currentMins = now.getHours() * 60 + now.getMinutes();
+
+        // En yakın ileriki saatin index'ini bul
+        let nextIndex = activeDepartures.findIndex((time: string) => {
+            const [h, m] = time.split(':').map(Number);
+            return (h * 60 + m) >= currentMins;
+        });
+
+        if (nextIndex === -1 && activeDepartures.length > 0) {
+            nextIndex = activeDepartures.length - 1; // Hepsi geçtiyse sona git
+        }
+
+        setNextDepartureIndex(nextIndex);
+
+        if (nextIndex > 0 && timeListRef.current) {
+            setTimeout(() => {
+                try {
+                    timeListRef.current?.scrollToIndex({ index: nextIndex, animated: true, viewPosition: 0.5 });
+                } catch (e) {
+                    console.warn('Sefer saatleri scroll hatasi', e);
+                }
+            }, 600); // Popup çiziminden sonra kaydır
+        }
+    }, [activeDepartures, selectedDayType, selectedDirection]);
 
     // 15 Saniyelik Geri Sayım (Cooldown) Efekti
     useEffect(() => {
@@ -187,78 +224,15 @@ export default function RouteDetailScreen() {
 
     const filteredVehicles = useMemo(() => {
         if (!vehiclesState.data) return [];
-
         const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
-        const stops0 = routeStopsData[id]?.[0] || [];
 
         return vehiclesState.data.filter(bus => {
             if (!bus.latitude || !bus.longitude) return false;
-
-            let finalDirection = String(bus.direction);
-
-            // Vektör (Hareket Yönü) Analizi: ESHOT araç takılı kalırsa gittiği yöne göre otomatik algıla
-            const history = globalVehicleTracker[bus.busId];
-
-            if (history) {
-                // Eğer en az 25m gitmişse yönüne karar ver, aksi takdirde eski kararı koru (kırmızı ışık vs)
-                const distMoved = calculateDistance(history.lat, history.lon, bus.latitude, bus.longitude);
-
-                if (distMoved > 25 && stops0.length > 0) {
-                    let oldMinDist = Infinity; let oldIndex = -1;
-                    let newMinDist = Infinity; let newIndex = -1;
-
-                    stops0.forEach((stopId, idx) => {
-                        const s = gtfsStops[stopId];
-                        if (s && s.lat) {
-                            const dOld = calculateDistance(history.lat, history.lon, s.lat, s.lon);
-                            const dNew = calculateDistance(bus.latitude as number, bus.longitude as number, s.lat, s.lon);
-                            if (dOld < oldMinDist) { oldMinDist = dOld; oldIndex = idx; }
-                            if (dNew < newMinDist) { newMinDist = dNew; newIndex = idx; }
-                        }
-                    });
-
-                    if (oldIndex !== -1 && newIndex !== -1) {
-                        let conf = history.confidence || 0;
-                        if (newIndex > oldIndex) {
-                            // İleri gidiş algılandı, skoru artır
-                            conf += 1;
-                            if (conf > 2) conf = 2; // Max limit
-                        } else if (newIndex < oldIndex) {
-                            // Geri dönüş algılandı, skoru düşür
-                            conf -= 1;
-                            if (conf < -2) conf = -2; // Min limit
-                        }
-
-                        globalVehicleTracker[bus.busId].confidence = conf;
-
-                        // Yalnızca ardışık -2 veya +2 eminliğe ulaşınca Yönü Ez! (Flicker Koruması)
-                        if (conf >= 2) {
-                            finalDirection = 'Gidiş';
-                            globalVehicleTracker[bus.busId].trueDir = 'Gidiş';
-                        } else if (conf <= -2) {
-                            finalDirection = 'Dönüş';
-                            globalVehicleTracker[bus.busId].trueDir = 'Dönüş';
-                        } else if (history.trueDir) {
-                            // Henüz tam emin değilse eski kararı koru
-                            finalDirection = history.trueDir;
-                        }
-                    }
-
-                } else if (history.trueDir) {
-                    finalDirection = history.trueDir;
-                }
-
-                // Yeni konumu güncelle (bir sonraki vektör analizi için)
-                globalVehicleTracker[bus.busId].lat = bus.latitude as number;
-                globalVehicleTracker[bus.busId].lon = bus.longitude as number;
-            } else {
-                // İlk göründüğünde ESHOT verisini kullan ve hafızaya al
-                globalVehicleTracker[bus.busId] = { lat: bus.latitude as number, lon: bus.longitude as number, trueDir: finalDirection, confidence: 0 };
-            }
-
-            return finalDirection === expectedDirStr;
+            return String(bus.direction) === expectedDirStr;
         });
     }, [vehiclesState.data, selectedDirection, id]);
+
+
 
     return (
         <View style={styles.container}>
@@ -285,7 +259,7 @@ export default function RouteDetailScreen() {
                 style={styles.scrollView}
                 contentContainerStyle={{ paddingBottom: Spacing.xxxl }}
                 showsVerticalScrollIndicator={false}
-                scrollEnabled={isScrollEnabled}
+                scrollEnabled={isScrollEnabledVal}
                 initialNumToRender={10}
                 maxToRenderPerBatch={10}
                 windowSize={5}
@@ -485,14 +459,32 @@ export default function RouteDetailScreen() {
                                 </View>
 
                                 {activeDepartures.length > 0 ? (
-                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: Spacing.sm }} contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.xs }}>
-                                        {activeDepartures.map((time: string, idx: number) => (
-                                            <View key={`time-${idx}`} style={styles.timeBadge}>
-                                                <Ionicons name="time-outline" size={14} color={Colors.primary} style={{ marginRight: 4 }} />
-                                                <Text style={styles.timeBadgeText}>{time}</Text>
-                                            </View>
-                                        ))}
-                                    </ScrollView>
+                                    <FlatList
+                                        ref={timeListRef}
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        onScrollToIndexFailed={info => {
+                                            const wait = new Promise(resolve => setTimeout(resolve, 500));
+                                            wait.then(() => {
+                                                try {
+                                                    timeListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+                                                } catch (e) { }
+                                            });
+                                        }}
+                                        style={{ marginTop: Spacing.sm }}
+                                        contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: Spacing.xs }}
+                                        data={activeDepartures}
+                                        keyExtractor={(item, idx) => `time-${idx}`}
+                                        renderItem={({ item: time, index }) => {
+                                            const isNext = index === nextDepartureIndex;
+                                            return (
+                                                <View style={[styles.timeBadge, isNext && { backgroundColor: Colors.primary }]}>
+                                                    <Ionicons name="time-outline" size={14} color={isNext ? Colors.white : Colors.primary} style={{ marginRight: 4 }} />
+                                                    <Text style={[styles.timeBadgeText, isNext && { color: Colors.white, fontWeight: FontWeights.bold }]}>{time}</Text>
+                                                </View>
+                                            );
+                                        }}
+                                    />
                                 ) : (
                                     <View style={{ paddingHorizontal: Spacing.md, marginTop: Spacing.sm }}>
                                         <Text style={{ color: Colors.textSecondary }}>Bu gün tipi için sefer bilgisi bulunamadı.</Text>
@@ -599,7 +591,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: Spacing.sm,
         paddingVertical: Spacing.xs,
         borderRadius: BorderRadius.sm,
-        marginRight: Spacing.xs,
     },
     timeBadgeText: {
         fontSize: FontSizes.sm,

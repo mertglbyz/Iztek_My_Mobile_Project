@@ -1,6 +1,20 @@
 {
-  "executionTime": "2026-07-14T10:57:41.797Z",
+  "executionTime": "2026-07-16T08:27:15.730Z",
   "filesProcessed": {
+    "agency.txt": {
+      "success": true,
+      "rowCount": 1
+    },
+    "feed_info.txt": {
+      "success": false,
+      "status": "not_found",
+      "rowCount": 0
+    },
+    "calendar_dates.txt": {
+      "success": false,
+      "status": "not_found",
+      "rowCount": 0
+    },
     "routes.txt": {
       "success": true,
       "rowCount": 427
@@ -34,6 +48,13 @@
     "shapePointsCount": 400840
   },
   "warnings": [],
+  "polyLineOptimization": {
+    "rawShapePointsCount": 400840,
+    "writtenShapePointsCount": 400840,
+    "reductionMethod": "5 Decimal Truncation (No Point Deletion)",
+    "distanceThresholdMeters": 0,
+    "outputFileSizeMB": "7.569 MB"
+  },
   "stopsComparison": {
     "oldStopsCount": 11783,
     "gtfsStopsCount": 11510,
