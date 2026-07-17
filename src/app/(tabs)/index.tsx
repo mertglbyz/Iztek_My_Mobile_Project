@@ -76,7 +76,7 @@ export default function HomeScreen() {
                                 iconName="map-outline"
                                 iconColor={Colors.accent}
                                 iconBg={Colors.accentSoft}
-                                onPress={() => Alert.alert('Yakında', 'Rota planlama (Nasıl Giderim) özelliği geliştirme aşamasındadır.')}
+                                onPress={() => router.push('/(tabs)/directions')}
                             />
                             <View style={styles.cardGap} />
                             <ActionCard

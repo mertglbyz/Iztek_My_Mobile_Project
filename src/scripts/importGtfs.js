@@ -230,11 +230,22 @@ async function runImport() {
     report.filesProcessed['stop_times.txt'] = resStopTimes;
 
     // Durak sekanslarını numaraya göre sırala
+    const stopRoutesIndex = {}; // FAZ 10: Ters İndeks
     for (const rId in routeStopsData) {
         for (const dId in routeStopsData[rId]) {
             routeStopsData[rId][dId].sort((a, b) => a.sequence - b.sequence);
             // Sadece ID mapine vur (Hafifletme)
             routeStopsData[rId][dId] = routeStopsData[rId][dId].map(s => s.stop_id);
+
+            // Ters indeks oluşturma
+            routeStopsData[rId][dId].forEach((stopId, idx) => {
+                if (!stopRoutesIndex[stopId]) stopRoutesIndex[stopId] = [];
+                stopRoutesIndex[stopId].push({
+                    routeId: rId,
+                    directionId: dId,
+                    sequence: idx
+                });
+            });
         }
     }
 
@@ -307,6 +318,7 @@ async function runImport() {
     report.polyLineOptimization.outputFileSizeMB = `${shapesFileSizeMB} MB`;
 
     fs.writeFileSync(path.join(OUT_DIR, 'trips_index.json'), JSON.stringify(representativeTrips), 'utf8');
+    fs.writeFileSync(path.join(OUT_DIR, 'stop_routes_index.json'), JSON.stringify(stopRoutesIndex), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'service_calendar.json'), JSON.stringify(serviceCalendar), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_departures.json'), JSON.stringify(routeDepartures), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'gtfs_stops.json'), JSON.stringify(gtfsStops), 'utf8');

@@ -55,8 +55,19 @@ Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için ş
 - `calendar_dates.txt` veritabanı sistemde bulunmadığı/gelmediği için, yılbaşı gibi özel gün veya resmi tatillerdeki olağanüstü sefer istisnaları hesaba **katılamamaktadır**.
 - Belirtilen saatler kesinlikle **canlı araç tahmini (ETA) değildir**; resmi planlanan program listesidir.
 
-## Sonraki faz: Nasıl Giderim / rota planlama
-Planlaması yapılan fakat henüz arayüze eklenmeyen `tripPlanner.ts` servisi yazılmıştır. Başlangıç ve varış durakları arası aktarmasız rota analiz testleri servis katmanında tamamlanmış, UI katmanına entegrasyonu bir sonraki faza bırakılmıştır.
+## Rota Planlama (Nasıl Giderim)
+GTFS Ters İndeksleme tabanlı performanslı bir seyahat planlayıcı (Trip Planner) modülü sisteme başarıyla entegre edilmiştir. Sistem mimarisi aşağıdaki temeller üzerine oturtulmuştur:
+- **Aktarmasız Rotalar:** O(1) indeks maliyetiyle aynı hat ve yön üzerindeki direkt seferlerin tespit edilmesi.
+- **Tek Aktarmalı Rotalar:** Array Intersection mantığı ile, iki farklı hattın esnek kesişimine dayanan optimize edilmiş aktarma düğümlerinin hesaplanması.
+- **Kategorik Sıralama:** Listeleme algoritmaları "Aktarmasız" ve "Aktarmalı" olacak şekilde ayrılarak kullanıcının zaman kazancını üst düzeye çıkarmak üzere optimize edilmiştir.
+- **Duyarlı (Responsive) Arayüz:** 11.510 durak datası içerisinde gecikmesiz arama sunan Dropdown motoru geliştirilmiş, arayüz elementleri React Native `FlatList` mimarisine oturtularak bellek (RAM) tüketimi asgariye çekilmiştir.
+
+### Faz 10 Teslimiyet Özeti
+Mühendisin belirlediği `Teslim Kriterleri` uyarınca sağlanan doğrulamalar:
+- **Ters İndeks Kullanımı:** `importGtfs.js` içerisine gömülü ters indeksleme sistemi yazılmış olup, build anında `stop_routes_index.json` dosyası arka planda (O(1)) üretilmektedir.
+- **Hata Toleransı ve UI Kartları:** `directions.tsx` üzerinden ekran durumları gerçek GTFS verisi üzerinden modellenerek aktarmalı, aktarmasız ve bulunamadı durumlarına reaksiyon veren UI mimarisi oturtulmuştur.
+- **TypeScript Derlemesi:** Rota planlayıcı sınıfları type-safe yapılmış olup, `npx tsc --noEmit` sonucu terminalde **Hatasız (Exit code: 0)** olarak derlenmiştir.
+- **Detaylı Algoritma Testleri:** Çapraz geçiş, aynı durak vb. tüm kilitlenme senaryoları belgelenerek `docs/trip-planner-tests.md` dosyasıyla projeye eklenmiştir.
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. Terminalden `npm install` komutuyla Expo ve React bağımlılıklarını kurun.
