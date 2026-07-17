@@ -11,7 +11,7 @@ Bu proje, İzmir ESHOT toplu taşıma Açık Veri Portalı verilerini kullanarak
 - **Optimizasyon Bileşenleri:** `FlatList`, `useMemo`, `useCallback`
 
 ## GTFS veri kaynağı
-Projeye GTFS (General Transit Feed Specification) entegrasyonu başarıyla sağlanmıştır. İzmir Açık Veri Portalı üzerinden alınan standart transit veriler (`routes.txt`, `stop_times.txt`, vb.) Node.js ile işlenmektedir. Ayrıca canlı veriler için ESHOT servisleri aktif kullanılmaktadır.
+Proje kapsamında GTFS (General Transit Feed Specification) entegrasyonu için ana kapsam tamamlandı. İzmir Açık Veri Portalı üzerinden alınan standart transit veriler (`routes.txt`, `stop_times.txt`, vb.) Node.js ile işlenmektedir. Ayrıca canlı veriler için ESHOT servisleri aktif kullanılmaktadır.
 
 ## GTFS import süreci
 Sistem, bellek tüketimini azaltmak adına derleme öncesi `importGtfs.js` çalıştırılarak optimize edilmektedir:
@@ -57,16 +57,16 @@ Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için ş
 
 ## Rota Planlama (Nasıl Giderim)
 GTFS Ters İndeksleme tabanlı performanslı bir seyahat planlayıcı (Trip Planner) modülü sisteme başarıyla entegre edilmiştir. Sistem mimarisi aşağıdaki temeller üzerine oturtulmuştur:
-- **Aktarmasız Rotalar:** O(1) indeks maliyetiyle aynı hat ve yön üzerindeki direkt seferlerin tespit edilmesi.
+- **Aktarmasız Rotalar:** Aday hatlara ters indeks üzerinden erişildi; aynı hat ve yön üzerindeki direkt seferlerin tespit edilmesi kurgulandı.
 - **Tek Aktarmalı Rotalar:** Array Intersection mantığı ile, iki farklı hattın esnek kesişimine dayanan optimize edilmiş aktarma düğümlerinin hesaplanması.
-- **Kategorik Sıralama:** Listeleme algoritmaları "Aktarmasız" ve "Aktarmalı" olacak şekilde ayrılarak kullanıcının zaman kazancını üst düzeye çıkarmak üzere optimize edilmiştir.
-- **Duyarlı (Responsive) Arayüz:** 11.510 durak datası içerisinde gecikmesiz arama sunan Dropdown motoru geliştirilmiş, arayüz elementleri React Native `FlatList` mimarisine oturtularak bellek (RAM) tüketimi asgariye çekilmiştir.
+- **Kategorik Sıralama:** Listeleme algoritmaları "Aktarmasız" ve "Aktarmalı" olacak şekilde ayrılarak kullanıcının zaman kazancını üst düzeye çıkarmak üzere ayarlandı.
+- **Arama ve Kullanıcı Deneyimi:** Sonuçlar en fazla 10 kayıtla sınırlandırıldı; Dropdown ve arayüz elementleri React Native `FlatList` mimarisine oturtularak rota arama süreleri benchmark dosyasında ölçüldü.
 
-### Faz 10 Teslimiyet Özeti
-Mühendisin belirlediği `Teslim Kriterleri` uyarınca sağlanan doğrulamalar:
-- **Ters İndeks Kullanımı:** `importGtfs.js` içerisine gömülü ters indeksleme sistemi yazılmış olup, build anında `stop_routes_index.json` dosyası arka planda (O(1)) üretilmektedir.
+### Faz 11 Teslimiyet Özeti
+Belirlenen `Teslim Kriterleri` uyarınca sağlanan doğrulamalar:
+- **Ters İndeks Kullanımı:** `importGtfs.js` içerisine gömülü ters indeksleme sistemi yazılmış olup, build anında `stop_routes_index.json` dosyası arka planda üretilmektedir. Ters indeks sayesinde aday hatlara doğrudan erişilerek rota arama alanı ve hesaplama maliyeti azaltılmıştır.
 - **Hata Toleransı ve UI Kartları:** `directions.tsx` üzerinden ekran durumları gerçek GTFS verisi üzerinden modellenerek aktarmalı, aktarmasız ve bulunamadı durumlarına reaksiyon veren UI mimarisi oturtulmuştur.
-- **TypeScript Derlemesi:** Rota planlayıcı sınıfları type-safe yapılmış olup, `npx tsc --noEmit` sonucu terminalde **Hatasız (Exit code: 0)** olarak derlenmiştir.
+- **TypeScript Derlemesi:** Rota planlayıcı sınıfları type-safe yapılmış olup, `npx tsc --noEmit` sonucu terminalde izlenmiş ve test edilen senaryolarda sonuç üretildi.
 - **Detaylı Algoritma Testleri:** Çapraz geçiş, aynı durak vb. tüm kilitlenme senaryoları belgelenerek `docs/trip-planner-tests.md` dosyasıyla projeye eklenmiştir.
 
 ## Kurulum ve Test (Geliştiriciler İçin)

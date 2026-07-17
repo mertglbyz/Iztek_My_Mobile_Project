@@ -211,41 +211,116 @@ async function runImport() {
     });
     report.filesProcessed['stops.txt'] = resStops;
 
-    // 4. STOP_TIMES.TXT -> Sadece (Representative Trips) için durak dizilimini al
-    const routeStopsData = {}; // { route_short_name: { "0": [ {stop_id, seq} ] } }
+    // 4. STOP_TIMES.TXT (PASS 2) -> Temsilci sefer (Harita) + TÜM sefer (Pattern) durak dizilimleri
+    const routeStopsData = {}; // { route_short_name: { "0": [stop_id, ...] } } (Temsilci - Harita için)
+    const allTripStops = {};   // { trip_id: [ {stop_id, sequence} ] } (Tüm seferler - Pattern için)
+
     const resStopTimes = await parseGtfsFile('stop_times.txt', (row) => {
         const tripId = row.trip_id;
-        // Sadece ana temsilci seferin durak sırasıyla ilgileniyoruz (Performans!)
+        const trip = allTrips[tripId];
+        if (!trip) return; // Tanınmayan sefer
+
+        // Temsilci sefer: Harita için routeStopsData (eski davranış korunuyor)
         if (representativeTrips[tripId]) {
             const rep = representativeTrips[tripId];
             if (!routeStopsData[rep.routeShortName]) routeStopsData[rep.routeShortName] = {};
             if (!routeStopsData[rep.routeShortName][rep.directionId]) routeStopsData[rep.routeShortName][rep.directionId] = [];
-
             routeStopsData[rep.routeShortName][rep.directionId].push({
                 stop_id: row.stop_id,
                 sequence: parseInt(row.stop_sequence, 10)
             });
         }
+
+        // TÜM seferler: Pattern çıkarma için durak dizisini topla
+        if (!allTripStops[tripId]) allTripStops[tripId] = [];
+        allTripStops[tripId].push({
+            stop_id: row.stop_id,
+            sequence: parseInt(row.stop_sequence, 10)
+        });
     });
     report.filesProcessed['stop_times.txt'] = resStopTimes;
 
-    // Durak sekanslarını numaraya göre sırala
-    const stopRoutesIndex = {}; // FAZ 10: Ters İndeks
+    // Temsilci sefer durak sekanslarını sırala ve ID dizisine dönüştür (Harita içindir, değişmez)
     for (const rId in routeStopsData) {
         for (const dId in routeStopsData[rId]) {
             routeStopsData[rId][dId].sort((a, b) => a.sequence - b.sequence);
-            // Sadece ID mapine vur (Hafifletme)
             routeStopsData[rId][dId] = routeStopsData[rId][dId].map(s => s.stop_id);
+        }
+    }
 
-            // Ters indeks oluşturma
-            routeStopsData[rId][dId].forEach((stopId, idx) => {
-                if (!stopRoutesIndex[stopId]) stopRoutesIndex[stopId] = [];
-                stopRoutesIndex[stopId].push({
-                    routeId: rId,
-                    directionId: dId,
-                    sequence: idx
+    // ============================================
+    // FAZ 11 MADDE 2: ROUTE_PATTERNS.JSON (Güzergâh Varyantları)
+    // ============================================
+    console.log("[FAZ 11] route_patterns.json üretiliyor...");
+
+    // Her seferin durak dizisini sıralayıp, aynı diziye sahip seferleri tek pattern altında birleştir
+    const routePatterns = {}; // { routeShortName: { dirId: [ {patternId, stopIds, tripCount} ] } }
+    let totalPatternCount = 0;
+
+    for (const tripId in allTripStops) {
+        const trip = allTrips[tripId];
+        if (!trip) continue;
+
+        const { routeShortName, directionId } = trip;
+        const stops = allTripStops[tripId].sort((a, b) => a.sequence - b.sequence);
+        const stopIds = stops.map(s => s.stop_id);
+        const seqKey = stopIds.join(','); // Hash olarak virgülle birleştirilmiş durak dizisi
+
+        if (!routePatterns[routeShortName]) routePatterns[routeShortName] = {};
+        if (!routePatterns[routeShortName][directionId]) routePatterns[routeShortName][directionId] = {};
+
+        if (!routePatterns[routeShortName][directionId][seqKey]) {
+            totalPatternCount++;
+            routePatterns[routeShortName][directionId][seqKey] = {
+                patternId: `${routeShortName}-${directionId}-${Object.keys(routePatterns[routeShortName][directionId]).length + 1}`,
+                stopIds: stopIds,
+                tripCount: 0
+            };
+        }
+        routePatterns[routeShortName][directionId][seqKey].tripCount++;
+    }
+
+    // seqKey bazlı objeyi array'e dönüştür ve tripCount'a göre sırala (en çok kullanılan en üstte)
+    const routePatternsOutput = {};
+    for (const rId in routePatterns) {
+        routePatternsOutput[rId] = {};
+        for (const dId in routePatterns[rId]) {
+            routePatternsOutput[rId][dId] = Object.values(routePatterns[rId][dId])
+                .sort((a, b) => b.tripCount - a.tripCount);
+        }
+    }
+
+    console.log(`[FAZ 11] Toplam ${totalPatternCount} benzersiz güzergâh pattern'ı bulundu.`);
+    report.stats.routePatternCount = totalPatternCount;
+
+    // Belleği temizle - artık allTripStops'a ihtiyaç yok
+    for (const key in allTripStops) delete allTripStops[key];
+
+    // ============================================
+    // TERS İNDEKS: Tüm pattern'lardan üret (Madde 1 retroaktif düzeltme)
+    // ============================================
+    // Eski yaklaşım: Sadece temsilci sefer duraklarını indeksliyordu.
+    // Yeni yaklaşım: TÜM benzersiz pattern dizilimlerini tarayarak, bir durağa uğrayan her hat+yön+sıra bilgisini üretir.
+    const stopRoutesIndex = {};
+    for (const rId in routePatternsOutput) {
+        for (const dId in routePatternsOutput[rId]) {
+            const patterns = routePatternsOutput[rId][dId];
+            // Her pattern'ın duraklarını indeksle (aynı hat+yön+durak ikilisi zaten Set ile filtrelenecek)
+            const addedKeys = new Set(); // "stopId-routeId-dirId" duplikasyon engeli
+            for (const pattern of patterns) {
+                pattern.stopIds.forEach((stopId, idx) => {
+                    const dupKey = `${stopId}-${rId}-${dId}`;
+                    if (!addedKeys.has(dupKey)) {
+                        addedKeys.add(dupKey);
+                        if (!stopRoutesIndex[stopId]) stopRoutesIndex[stopId] = [];
+                        stopRoutesIndex[stopId].push({
+                            routeId: rId,
+                            directionId: dId,
+                            sequence: idx
+                        });
+                    }
                 });
-            });
+            }
         }
     }
 
@@ -319,6 +394,7 @@ async function runImport() {
 
     fs.writeFileSync(path.join(OUT_DIR, 'trips_index.json'), JSON.stringify(representativeTrips), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'stop_routes_index.json'), JSON.stringify(stopRoutesIndex), 'utf8');
+    fs.writeFileSync(path.join(OUT_DIR, 'route_patterns.json'), JSON.stringify(routePatternsOutput), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'service_calendar.json'), JSON.stringify(serviceCalendar), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_departures.json'), JSON.stringify(routeDepartures), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'gtfs_stops.json'), JSON.stringify(gtfsStops), 'utf8');
@@ -381,6 +457,153 @@ async function runImport() {
         }
     }
 
+
+    // ============================================
+    // FAZ 11 MADDE 1: PLANNER_STOPS.JSON (Birleşik Durak Kaynağı)
+    // ============================================
+    // Kaynak önceliği: GTFS stops.txt → CSV stops.json (sadece fallback)
+    // CSV-only duraklar hariç tutulur, GTFS-only duraklar dahil edilir.
+    console.log("[FAZ 11] planner_stops.json üretiliyor...");
+
+    // Her durağa uğrayan hatları hesapla (TÜM PATTERN'lardan - Madde 1 retroaktif düzeltme)
+    const stopToRoutes = {}; // { stopId: Set<routeId> }
+    for (const routeId in routePatternsOutput) {
+        for (const dirId in routePatternsOutput[routeId]) {
+            for (const pattern of routePatternsOutput[routeId][dirId]) {
+                pattern.stopIds.forEach(sId => {
+                    if (!stopToRoutes[sId]) stopToRoutes[sId] = new Set();
+                    stopToRoutes[sId].add(routeId);
+                });
+            }
+        }
+    }
+
+    // Eski CSV durakları yükle (fallback için)
+    let oldStopsMap = {};
+    const oldStopsPathPlanner = path.join(__dirname, '../data/stops.json');
+    if (fs.existsSync(oldStopsPathPlanner)) {
+        try {
+            const oldArr = JSON.parse(fs.readFileSync(oldStopsPathPlanner, 'utf8'));
+            if (Array.isArray(oldArr)) {
+                oldArr.forEach(s => {
+                    oldStopsMap[String(s.id)] = s;
+                });
+            }
+        } catch (e) {
+            console.warn("[WARN] Eski stops.json fallback için okunamadı:", e.message);
+        }
+    }
+
+    // Birleşik durak listesi oluştur (Sadece GTFS durakları)
+    const plannerStops = [];
+    for (const stopId in gtfsStops) {
+        const gs = gtfsStops[stopId];
+        let name = gs.name;
+        let lat = gs.lat;
+        let lon = gs.lon;
+        let source = "gtfs";
+
+        // GTFS'te ad veya koordinat eksikse CSV fallback
+        if ((!name || !lat || !lon) && oldStopsMap[stopId]) {
+            const csv = oldStopsMap[stopId];
+            if (!name) name = csv.name || 'Bilinmiyor';
+            if (!lat) lat = parseFloat(csv.latitude) || parseFloat(csv.lat) || 0;
+            if (!lon) lon = parseFloat(csv.longitude) || parseFloat(csv.lon) || 0;
+            source = "gtfs+csv_fallback";
+        }
+
+        // Koordinatı olmayanları atla
+        if (!lat || !lon) continue;
+
+        const routes = stopToRoutes[stopId] ? Array.from(stopToRoutes[stopId]).sort((a, b) => Number(a) - Number(b)) : [];
+
+        plannerStops.push({
+            id: stopId,
+            name: name || 'Bilinmiyor',
+            latitude: Number(lat.toFixed(5)),
+            longitude: Number(lon.toFixed(5)),
+            routeCount: routes.length,
+            routes: routes,
+            source: source
+        });
+    }
+
+    // İsme göre sırala
+    plannerStops.sort((a, b) => a.name.localeCompare(b.name, 'tr-TR'));
+
+    // ============================================
+    // FAZ 11 MADDE 3: DURAK YAKINLIK İNDEKSİ (nearby_stops_index.json)
+    // ============================================
+    console.log("[FAZ 11] nearby_stops_index.json üretiliyor (Grid Spatial Hashing ile)...");
+
+    // Haversine fonksiyonları
+    function deg2rad(deg) { return deg * (Math.PI / 180); }
+    function getDistanceMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Yarıçap (m)
+        const dLat = deg2rad(lat2 - lat1);
+        const dLon = deg2rad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+    }
+
+    // Grid ayarlaması ~0.002 = ~200 metre (Izmir enleminde)
+    const CELL_SIZE = 0.002;
+    const grid = {}; // { "lat_lon": [stop1, stop2] }
+
+    plannerStops.forEach(stop => {
+        const latCell = Math.floor(stop.latitude / CELL_SIZE);
+        const lonCell = Math.floor(stop.longitude / CELL_SIZE);
+        const cellKey = `${latCell}_${lonCell}`;
+        if (!grid[cellKey]) grid[cellKey] = [];
+        grid[cellKey].push(stop);
+    });
+
+    const nearbyStopsIndex = {}; // { stopId: [{stopId, distanceMeters}] }
+    let totalConnections = 0;
+
+    plannerStops.forEach(stop => {
+        const latCell = Math.floor(stop.latitude / CELL_SIZE);
+        const lonCell = Math.floor(stop.longitude / CELL_SIZE);
+        const nearby = [];
+
+        // Kendi hücresi dahil 9 komşu hücreyi tara
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                const neighborKey = `${latCell + i}_${lonCell + j}`;
+                if (grid[neighborKey]) {
+                    grid[neighborKey].forEach(neighborStop => {
+                        if (stop.id !== neighborStop.id) {
+                            const dist = getDistanceMeters(stop.latitude, stop.longitude, neighborStop.latitude, neighborStop.longitude);
+                            if (dist <= 150) {
+                                nearby.push({
+                                    stopId: neighborStop.id,
+                                    distanceMeters: dist
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        if (nearby.length > 0) {
+            // Mesafeye göre artan sıraya koy
+            nearby.sort((a, b) => a.distanceMeters - b.distanceMeters);
+            nearbyStopsIndex[stop.id] = nearby;
+            totalConnections += nearby.length;
+        }
+    });
+
+    console.log(`[FAZ 11] Toplam ${totalConnections} yürüme bağlantısı bulundu.`);
+    report.stats.nearbyConnectionsCount = totalConnections;
+    fs.writeFileSync(path.join(OUT_DIR, 'nearby_stops_index.json'), JSON.stringify(nearbyStopsIndex), 'utf8');
+
+    fs.writeFileSync(path.join(OUT_DIR, 'planner_stops.json'), JSON.stringify(plannerStops), 'utf8');
+    console.log(`[FAZ 11] planner_stops.json yazıldı. Toplam: ${plannerStops.length} durak`);
+    report.stats.plannerStopsCount = plannerStops.length;
 
     fs.writeFileSync(path.join(OUT_DIR, 'import_report.json'), JSON.stringify(report, null, 2), 'utf8');
 

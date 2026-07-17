@@ -45,3 +45,4 @@ eshot-otobus-duraklari.csv
 !README.md
 *.csv
 !docs/trip-planner-tests.md
+!docs/trip-planner-benchmark.md

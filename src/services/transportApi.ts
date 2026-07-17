@@ -282,16 +282,42 @@ export const getServiceIdsByDayType = () => {
   const calendar: Record<string, any> = serviceCalendarRaw as any;
   const groups: Record<string, string[]> = { weekday: [], saturday: [], sunday: [] };
 
-  Object.values(calendar).forEach(s => {
-    if (s.monday === '1' && s.saturday === '0' && s.sunday === '0') groups.weekday.push(s.service_id);
-    else if (s.saturday === '1' && s.monday === '0') groups.saturday.push(s.service_id);
-    else if (s.sunday === '1' && s.monday === '0') groups.sunday.push(s.service_id);
-    // Her gün çalışan (standart haftalık) tanımlamalar varsa hepsine dahil et
-    else if (s.monday === '1' && s.saturday === '1' && s.sunday === '1') {
-      groups.weekday.push(s.service_id);
-      groups.saturday.push(s.service_id);
-      groups.sunday.push(s.service_id);
+  // YYYYMMDD formati hazirla
+  const today = new Date();
+  const currentDate = Number(
+    today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0')
+  );
+
+  // GTFS veri setinin eskimiş olma durumuna karşı maksimum Bitiş Tarihini bul:
+  let maxEndDate = 0;
+  Object.values(calendar).forEach((s: any) => {
+    if (s.end_date && Number(s.end_date) > maxEndDate) {
+      maxEndDate = Number(s.end_date);
     }
+  });
+
+  // Eğer veritabanındaki en güncel takvim bile geçmişte kaldıysa (GTFS güncel değilse)
+  // Sistemin boş dönmemesi için tarih kısıtlamasını esnet (Graceful Fallback)
+  const isDataExpired = maxEndDate > 0 && currentDate > maxEndDate;
+
+  Object.values(calendar).forEach(s => {
+    // Madde 10: start_date ve end_date kontrolu (tarih disinda kalanlari ele)
+    if (s.start_date && s.end_date && !isDataExpired) {
+      if (currentDate < Number(s.start_date) || currentDate > Number(s.end_date)) {
+        return;
+      }
+    }
+
+    // Sadece monday degil, tum hafta ici gunleri birlikte degerlendirilir
+    const isWeekday = s.monday === '1' || s.tuesday === '1' || s.wednesday === '1' || s.thursday === '1' || s.friday === '1';
+    const isSaturday = s.saturday === '1';
+    const isSunday = s.sunday === '1';
+
+    if (isWeekday) groups.weekday.push(s.service_id);
+    if (isSaturday) groups.saturday.push(s.service_id);
+    if (isSunday) groups.sunday.push(s.service_id);
   });
 
   return groups;

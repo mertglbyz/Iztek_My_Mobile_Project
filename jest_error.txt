@@ -1,0 +1,12 @@
+FAIL src/__tests__/tripPlanner.test.ts
+  ● Test suite failed to run
+
+    TypeError: this._moduleMocker.clearMocksOnScope is not a function
+
+      at Runtime.resetModules (node_modules/jest-runtime/build/index.js:3784:28)
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0.172 s
+Ran all test suites.

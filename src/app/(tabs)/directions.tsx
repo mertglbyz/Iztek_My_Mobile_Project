@@ -1,6 +1,7 @@
 import ScreenHeader from '@/components/common/ScreenHeader';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
-import { getAllRoutes, getStops } from '@/services/transportApi';
+import plannerStopsRaw from '@/data/gtfs/planner_stops.json';
+import { getAllRoutes } from '@/services/transportApi';
 import { DirectRouteResult, findRoutes, TransferRouteResult, TripPlanResult } from '@/services/tripPlanner';
 import { BusStop } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +29,15 @@ export default function DirectionsScreen() {
     const [searchState, setSearchState] = useState<SearchState>('idle');
 
     useEffect(() => {
-        getStops().then(setStops);
+        // Planner durakları: GTFS birleşik kaynağından yükle, BusStop tipine uyumla
+        const mapped: BusStop[] = (plannerStopsRaw as any[]).map(s => ({
+            id: s.id,
+            name: s.name,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            routes: (s.routes || []).map(Number),
+        }));
+        setStops(mapped);
         getAllRoutes().then(setRoutesCache);
     }, []);
 
@@ -90,7 +99,7 @@ export default function DirectionsScreen() {
         setActiveInput(null);
         Keyboard.dismiss();
 
-        // UI gecikmesi (spinner) için setTimeout kullanıyoruz (Ağır array işlemini bekletmemesi için)
+        // UI thread'in loading state'ini render etmesi için tek bir frame bekletilir
         setTimeout(async () => {
             try {
                 const results = await findRoutes(String(originStop.id), String(destStop.id));
@@ -127,12 +136,29 @@ export default function DirectionsScreen() {
                     >
                         <Text style={styles.tripRouteName}>{direct.routeId} - {getRouteNameById(direct.routeId)}</Text>
                     </TouchableOpacity>
-                    <Text style={styles.tripSummary}>
-                        {getStopNameById(direct.boardingStopId)} durağından bin
-                    </Text>
-                    <Text style={styles.tripSummary}>
-                        {getStopNameById(direct.alightingStopId)} durağında in
-                    </Text>
+                    {direct.walkingToBoardingMeters ? (
+                        <Text style={[styles.tripSummary, { color: Colors.primary }]}>
+                            🚶 {getStopNameById(direct.actualBoardingStopId!)} durağına {direct.walkingToBoardingMeters}m yürü
+                        </Text>
+                    ) : (
+                        <Text style={styles.tripSummary}>
+                            {getStopNameById(direct.boardingStopId)} durağından bin
+                        </Text>
+                    )}
+                    {direct.walkingFromAlightingMeters ? (
+                        <>
+                            <Text style={styles.tripSummary}>
+                                {getStopNameById(direct.actualAlightingStopId!)} durağında in
+                            </Text>
+                            <Text style={[styles.tripSummary, { color: Colors.primary }]}>
+                                🚶 {getStopNameById(direct.alightingStopId)} noktasına {direct.walkingFromAlightingMeters}m yürü
+                            </Text>
+                        </>
+                    ) : (
+                        <Text style={styles.tripSummary}>
+                            {getStopNameById(direct.alightingStopId)} durağında in
+                        </Text>
+                    )}
                     <View style={styles.linesRow}>
                         <Text style={styles.stopCountText}>{direct.stopCount} durak mesafe</Text>
                     </View>
@@ -149,8 +175,17 @@ export default function DirectionsScreen() {
                     <TouchableOpacity onPress={() => router.push(`/route/${transfer.firstRouteId}`)}>
                         <Text style={styles.tripRouteName}>{transfer.firstRouteId} numaralı hat</Text>
                     </TouchableOpacity>
+                    {transfer.walkingToBoardingMeters ? (
+                        <Text style={[styles.tripSummary, { color: Colors.primary }]}>
+                            🚶 {getStopNameById(transfer.actualBoardingStopId!)} durağına {transfer.walkingToBoardingMeters}m yürü
+                        </Text>
+                    ) : (
+                        <Text style={styles.tripSummary}>
+                            {getStopNameById(transfer.boardingStopId)} durağından bin
+                        </Text>
+                    )}
                     <Text style={styles.tripSummary}>
-                        {getStopNameById(transfer.boardingStopId)} › {getStopNameById(transfer.transferStopId)}
+                        {getStopNameById(transfer.transferStopId)} yönüne git
                     </Text>
 
                     <View style={styles.transferZone}>
@@ -161,9 +196,21 @@ export default function DirectionsScreen() {
                     <TouchableOpacity onPress={() => router.push(`/route/${transfer.secondRouteId}`)}>
                         <Text style={styles.tripRouteName}>{transfer.secondRouteId} numaralı hat</Text>
                     </TouchableOpacity>
-                    <Text style={styles.tripSummary}>
-                        {getStopNameById(transfer.transferStopId)} › {getStopNameById(transfer.alightingStopId)}
-                    </Text>
+
+                    {transfer.walkingFromAlightingMeters ? (
+                        <>
+                            <Text style={styles.tripSummary}>
+                                {getStopNameById(transfer.actualAlightingStopId!)} durağında in
+                            </Text>
+                            <Text style={[styles.tripSummary, { color: Colors.primary }]}>
+                                🚶 {getStopNameById(transfer.alightingStopId)} noktasına {transfer.walkingFromAlightingMeters}m yürü
+                            </Text>
+                        </>
+                    ) : (
+                        <Text style={styles.tripSummary}>
+                            {getStopNameById(transfer.alightingStopId)} durağında in
+                        </Text>
+                    )}
 
                     <View style={styles.linesRow}>
                         <Text style={styles.stopCountText}>Toplam {transfer.totalStopCount} durak mesafe</Text>

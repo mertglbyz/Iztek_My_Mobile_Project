@@ -1,5 +1,5 @@
 {
-  "executionTime": "2026-07-16T12:13:04.441Z",
+  "executionTime": "2026-07-17T08:24:46.824Z",
   "filesProcessed": {
     "agency.txt": {
       "success": true,
@@ -45,7 +45,10 @@
     "representativeTripsCount": 847,
     "totalTripsFound": 65012,
     "gtfsStopsCount": 11510,
-    "shapePointsCount": 400840
+    "shapePointsCount": 400840,
+    "routePatternCount": 847,
+    "nearbyConnectionsCount": 18426,
+    "plannerStopsCount": 11510
   },
   "warnings": [],
   "polyLineOptimization": {

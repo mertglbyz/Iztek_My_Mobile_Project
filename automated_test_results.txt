@@ -1,0 +1,19 @@
+PASS src/__tests__/tripPlanner.test.ts (6.729 s)
+  Trip Planner Algorithm Tests
+    √ aynı durak secilirse bos doner (Test 1) (3 ms)
+    √ dogru yonde aktarmasiz rota bulur (Test 2) (4 ms)
+    √ dogru yonde calisirken yanlis yonu dahil etmez (Test 3) (3 ms)
+    √ uzak duraklar arasi aktarma tarandiginda çökmeksizin calisir (Test 4) (1 ms)
+    √ varis sirasi baslangictan onceyse o yonu süzgece takilir (Test 5) (4 ms)
+    √ duplikasyon rotalar teke indirgenir (Test 6) (9 ms)
+    √ sonuclari maksimium 10 kayit ile limitler (Test 7) (3 ms)
+    √ 150m icerisindeki yakin duraklari adaya ekler (Test 8) (6 ms)
+    √ 150m siniri uzerindeki uzak duraklar adaya alinmaz (Test 9) (4 ms)
+    √ pattern varyantlarinda duzgun calisir (Test 10) (3 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        6.98 s
+Ran all test suites matching /src\\__tests__\\tripPlanner.test.ts/i.
+
