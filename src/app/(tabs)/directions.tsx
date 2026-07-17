@@ -225,7 +225,7 @@ export default function DirectionsScreen() {
             <View style={[styles.formCard, { marginHorizontal: 0, marginTop: 0 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
-                        <View style={styles.inputRow}>
+                        <View style={[styles.inputRow, activeInput === 'origin' && { zIndex: 50, elevation: 5 }]}>
                             <View style={styles.dotGreen} />
                             <TextInput
                                 style={styles.input}
@@ -243,9 +243,25 @@ export default function DirectionsScreen() {
                                     <Ionicons name="close-circle" size={18} color={Colors.textDisabled} />
                                 </TouchableOpacity>
                             )}
+
+                            {activeInput === 'origin' && suggestions.length > 0 && (
+                                <View style={[styles.dropdown, styles.dropdownFloating]}>
+                                    {suggestions.map((s, idx) => (
+                                        <TouchableOpacity key={idx} style={styles.dropdownItem} onPress={() => selectStop(s)}>
+                                            <View style={styles.dropdownItemTop}>
+                                                <Text style={styles.dropdownStopName} numberOfLines={1}>{s.name}</Text>
+                                                <Text style={styles.dropdownStopId}>({s.id})</Text>
+                                            </View>
+                                            <Text style={styles.dropdownRoutes} numberOfLines={1}>
+                                                Hatlar: {s.routes.slice(0, 4).join(', ')} {s.routes.length > 4 ? '...' : ''}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                         <View style={styles.divider} />
-                        <View style={styles.inputRow}>
+                        <View style={[styles.inputRow, activeInput === 'dest' && { zIndex: 50, elevation: 5 }]}>
                             <View style={styles.dotRed} />
                             <TextInput
                                 style={styles.input}
@@ -263,6 +279,22 @@ export default function DirectionsScreen() {
                                     <Ionicons name="close-circle" size={18} color={Colors.textDisabled} />
                                 </TouchableOpacity>
                             )}
+
+                            {activeInput === 'dest' && suggestions.length > 0 && (
+                                <View style={[styles.dropdown, styles.dropdownFloating]}>
+                                    {suggestions.map((s, idx) => (
+                                        <TouchableOpacity key={idx} style={styles.dropdownItem} onPress={() => selectStop(s)}>
+                                            <View style={styles.dropdownItemTop}>
+                                                <Text style={styles.dropdownStopName} numberOfLines={1}>{s.name}</Text>
+                                                <Text style={styles.dropdownStopId}>({s.id})</Text>
+                                            </View>
+                                            <Text style={styles.dropdownRoutes} numberOfLines={1}>
+                                                Hatlar: {s.routes.slice(0, 4).join(', ')} {s.routes.length > 4 ? '...' : ''}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     </View>
 
@@ -272,22 +304,6 @@ export default function DirectionsScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
-
-                {activeInput && suggestions.length > 0 && (
-                    <View style={styles.dropdown}>
-                        {suggestions.map((s, idx) => (
-                            <TouchableOpacity key={idx} style={styles.dropdownItem} onPress={() => selectStop(s)}>
-                                <View style={styles.dropdownItemTop}>
-                                    <Text style={styles.dropdownStopName} numberOfLines={1}>{s.name}</Text>
-                                    <Text style={styles.dropdownStopId}>({s.id})</Text>
-                                </View>
-                                <Text style={styles.dropdownRoutes} numberOfLines={1}>
-                                    Hatlar: {s.routes.slice(0, 4).join(', ')} {s.routes.length > 4 ? '...' : ''}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
             </View>
 
             <TouchableOpacity style={[styles.searchButton, { marginHorizontal: 0, marginBottom: Spacing.xl }]} onPress={executeSearch} activeOpacity={0.85}>
@@ -359,10 +375,23 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center'
     },
     dropdown: {
-        marginTop: Spacing.md,
-        borderTopWidth: 1,
-        borderTopColor: Colors.gray200,
         backgroundColor: Colors.white,
+    },
+    dropdownFloating: {
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        right: 0,
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+        borderRadius: BorderRadius.md,
+        ...Shadows.md,
+        paddingHorizontal: Spacing.sm,
+        paddingBottom: Spacing.sm,
+        marginTop: 4,
+        zIndex: 100,
+        elevation: 10
     },
     dropdownItem: {
         paddingVertical: Spacing.sm,
