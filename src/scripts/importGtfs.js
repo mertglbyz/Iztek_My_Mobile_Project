@@ -282,16 +282,38 @@ async function runImport() {
 
     // seqKey bazlı objeyi array'e dönüştür ve tripCount'a göre sırala (en çok kullanılan en üstte)
     const routePatternsOutput = {};
+    let routeDirectionCombinationCount = 0;
+    let multiPatternRouteDirectionCount = 0;
+    const multiPatternList = [];
+
     for (const rId in routePatterns) {
         routePatternsOutput[rId] = {};
         for (const dId in routePatterns[rId]) {
-            routePatternsOutput[rId][dId] = Object.values(routePatterns[rId][dId])
-                .sort((a, b) => b.tripCount - a.tripCount);
+            const patterns = Object.values(routePatterns[rId][dId]).sort((a, b) => b.tripCount - a.tripCount);
+            routePatternsOutput[rId][dId] = patterns;
+
+            routeDirectionCombinationCount++;
+            if (patterns.length > 1) {
+                multiPatternRouteDirectionCount++;
+                multiPatternList.push(`${rId} (Yön: ${dId}) - ${patterns.length} Farklı Pattern`);
+            }
         }
     }
 
     console.log(`[FAZ 11] Toplam ${totalPatternCount} benzersiz güzergâh pattern'ı bulundu.`);
-    report.stats.routePatternCount = totalPatternCount;
+
+    // Aşama 4 logları
+    report.stats.routeDirectionCombinationCount = routeDirectionCombinationCount;
+    report.stats.totalPatternCount = totalPatternCount; // Same as totalPatternCount defined above
+    report.stats.multiPatternRouteDirectionCount = multiPatternRouteDirectionCount;
+    report.stats.multiPatternList = multiPatternList;
+
+    if (multiPatternRouteDirectionCount === 0) {
+        console.log("[FAZ 11] Raporlanacak NOT: İncelenen GTFS arşivinde birden fazla durak pattern’ına sahip hat/yön kombinasyonu tespit edilmedi.");
+        report.stats.note = "İncelenen GTFS arşivinde birden fazla durak pattern’ına sahip hat/yön kombinasyonu tespit edilmedi.";
+    } else {
+        console.log(`[FAZ 11] Birden fazla pattern içeren hat/yön sayısı: ${multiPatternRouteDirectionCount}`);
+    }
 
     // Belleği temizle - artık allTripStops'a ihtiyaç yok
     for (const key in allTripStops) delete allTripStops[key];

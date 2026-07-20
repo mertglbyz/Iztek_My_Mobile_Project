@@ -3,26 +3,44 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('Trip Planner Benchmark', () => {
-    it('creates benchmark report for 10 pairs with 4 iterations', async () => {
-        const scenarios = [
-            // Çeşitli Senaryolar (Aktarmasız, Aktarmalı, veya Yürüyüşlü)
-            { start: '50312', end: '50014', desc: 'Kaymakamlık İstasyon -> İş Bankası Evleri' },
-            { start: '50014', end: '50312', desc: 'İş Bankası Evleri -> Kaymakamlık İstasyon' },
-            { start: '10177', end: '50039', desc: 'Hava Hastanesi -> Siteler' },
-            { start: '50039', end: '10177', desc: 'Siteler -> Hava Hastanesi' },
-            // Çapraz (Aktarmalı veya Yürüyüşlü) Senaryolar
-            { start: '50314', end: '50293', desc: 'Prof. Dr. Aziz Sancar Okulu -> Arıkent' },
-            { start: '50293', end: '50314', desc: 'Arıkent -> Prof. Dr. Aziz Sancar Okulu' },
-            { start: '50314', end: '16484', desc: 'Prof. Dr. Aziz Sancar Okulu -> Konak' },
-            { start: '16484', end: '50314', desc: 'Konak -> Prof. Dr. Aziz Sancar Okulu' },
-            { start: '50314', end: '50003', desc: 'Prof. Dr. Aziz Sancar Okulu -> Üçkuyular İskele Son Durak' },
-            { start: '50314', end: '50219', desc: 'Prof. Dr. Aziz Sancar Okulu -> İnciraltı Yeni Son Durak' }
+    it('creates benchmark report for 30 pairs with 4 iterations', async () => {
+        const distinctPairs: { start: string, end: string, desc: string, cat?: string }[] = [
+            { start: "13569", end: "11261", desc: "Aktarmasız: 13569 -> 11261", cat: "Aktarmasız" },
+            { start: "14215", end: "14206", desc: "Aktarmasız: 14215 -> 14206", cat: "Aktarmasız" },
+            { start: "52443", end: "50652", desc: "Aktarmasız: 52443 -> 50652", cat: "Aktarmasız" },
+            { start: "24310", end: "23128", desc: "Aktarmasız: 24310 -> 23128", cat: "Aktarmasız" },
+            { start: "10868", end: "11747", desc: "Aktarmasız: 10868 -> 11747", cat: "Aktarmasız" },
+            { start: "51743", end: "51787", desc: "Aktarmasız: 51743 -> 51787", cat: "Aktarmasız" },
+            { start: "10952", end: "15917", desc: "Aktarmasız: 10952 -> 15917", cat: "Aktarmasız" },
+            { start: "32011", end: "32453", desc: "Aktarmasız: 32011 -> 32453", cat: "Aktarmasız" },
+            { start: "30838", end: "30824", desc: "Aktarmasız: 30838 -> 30824", cat: "Aktarmasız" },
+            { start: "50599", end: "50957", desc: "Aktarmasız: 50599 -> 50957", cat: "Aktarmasız" },
+            { start: "12996", end: "15456", desc: "Tek Aktarmalı: 12996 -> 15456", cat: "Tek Aktarmalı" },
+            { start: "11059", end: "12885", desc: "Tek Aktarmalı: 11059 -> 12885", cat: "Tek Aktarmalı" },
+            { start: "52337", end: "50598", desc: "Tek Aktarmalı: 52337 -> 50598", cat: "Tek Aktarmalı" },
+            { start: "13961", end: "52439", desc: "Tek Aktarmalı: 13961 -> 52439", cat: "Tek Aktarmalı" },
+            { start: "30705", end: "30524", desc: "Tek Aktarmalı: 30705 -> 30524", cat: "Tek Aktarmalı" },
+            { start: "52305", end: "52143", desc: "Tek Aktarmalı: 52305 -> 52143", cat: "Tek Aktarmalı" },
+            { start: "14310", end: "31556", desc: "Tek Aktarmalı: 14310 -> 31556", cat: "Tek Aktarmalı" },
+            { start: "32328", end: "31205", desc: "Tek Aktarmalı: 32328 -> 31205", cat: "Tek Aktarmalı" },
+            { start: "31966", end: "32453", desc: "Tek Aktarmalı: 31966 -> 32453", cat: "Tek Aktarmalı" },
+            { start: "21321", end: "30333", desc: "Tek Aktarmalı: 21321 -> 30333", cat: "Tek Aktarmalı" },
+            { start: "11271", end: "50393", desc: "Yürüyüşlü: 11271 -> 50393", cat: "Yakın Durak Destekli" },
+            { start: "24353", end: "24045", desc: "Yürüyüşlü: 24353 -> 24045", cat: "Yakın Durak Destekli" },
+            { start: "23998", end: "22041", desc: "Yürüyüşlü: 23998 -> 22041", cat: "Yakın Durak Destekli" },
+            { start: "11158", end: "16407", desc: "Yürüyüşlü: 11158 -> 16407", cat: "Yakın Durak Destekli" },
+            { start: "15950", end: "15513", desc: "Yürüyüşlü: 15950 -> 15513", cat: "Yakın Durak Destekli" },
+            { start: "21676", end: "20244", desc: "Yürüyüşlü: 21676 -> 20244", cat: "Yakın Durak Destekli" },
+            { start: "13768", end: "11786", desc: "Yürüyüşlü: 13768 -> 11786", cat: "Yakın Durak Destekli" },
+            { start: "12701", end: "12223", desc: "Yürüyüşlü: 12701 -> 12223", cat: "Yakın Durak Destekli" },
+            { start: "15842", end: "16542", desc: "Yürüyüşlü: 15842 -> 16542", cat: "Yakın Durak Destekli" },
+            { start: "23328", end: "30522", desc: "Yürüyüşlü: 23328 -> 30522", cat: "Yakın Durak Destekli" }
         ];
 
-        // 10 farklı durak çiftini 4 kerede toplam 40 ölçüm simüle edelim
-        const extendedScenarios: typeof scenarios = [];
+        // 30 farklı durak çiftini 4 kere çalıştırarak toplam 120 ölçüm simüle edelim
+        const extendedScenarios: typeof distinctPairs = [];
         for (let i = 0; i < 4; i++) {
-            scenarios.forEach(s => extendedScenarios.push({ ...s, desc: `${s.desc} (Run ${i + 1})` }));
+            distinctPairs.forEach(s => extendedScenarios.push({ ...s, desc: `${s.desc} (Run ${i + 1})` }));
         }
 
         let reportMd = `# Trip Planner Performans Benchmark Raporu\n\n`;
@@ -89,7 +107,8 @@ describe('Trip Planner Benchmark', () => {
         });
 
         reportMd += `\n### Genel Özet\n`;
-        reportMd += `- 10 farklı durak çifti dört tekrar halinde çalıştırılarak toplam ${extendedScenarios.length} ölçüm alınmıştır.\n`;
+        reportMd += `- Farklı durak çifti sayısı: **${distinctPairs.length}**\n`;
+        reportMd += `- Toplam ölçüm sayısı: **${extendedScenarios.length}**\n`;
         reportMd += `- Genel Ortalama Süre: **${avgTime.toFixed(2)} ms**\n`;
         reportMd += `- En Yüksek Süre (Zirve): **${highestTime.toFixed(2)} ms**\n`;
         reportMd += `- Zaman Performansı: Ters indeks kullanımı sayesinde hesaplama süreleri milisaniyeler seviyesinde gerçekleşmiştir.\n`;

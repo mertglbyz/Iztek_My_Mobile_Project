@@ -1,5 +1,5 @@
 {
-  "executionTime": "2026-07-17T08:24:46.824Z",
+  "executionTime": "2026-07-20T12:57:24.789Z",
   "filesProcessed": {
     "agency.txt": {
       "success": true,
@@ -46,7 +46,11 @@
     "totalTripsFound": 65012,
     "gtfsStopsCount": 11510,
     "shapePointsCount": 400840,
-    "routePatternCount": 847,
+    "routeDirectionCombinationCount": 847,
+    "totalPatternCount": 847,
+    "multiPatternRouteDirectionCount": 0,
+    "multiPatternList": [],
+    "note": "İncelenen GTFS arşivinde birden fazla durak pattern’ına sahip hat/yön kombinasyonu tespit edilmedi.",
     "nearbyConnectionsCount": 18426,
     "plannerStopsCount": 11510
   },

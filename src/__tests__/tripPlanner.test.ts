@@ -1,3 +1,5 @@
+import routePatternsRaw from '@/data/gtfs/route_patterns.json';
+import stopRoutesIndexRaw from '@/data/gtfs/stop_routes_index.json';
 import { DirectRouteResult, findRoutes } from '@/services/tripPlanner';
 
 describe('Trip Planner Algorithm Tests', () => {
@@ -8,27 +10,28 @@ describe('Trip Planner Algorithm Tests', () => {
         expect(results).toEqual([]);
     });
 
-    // Test 2: Hat 304, Konak (10030) → Şirinyer Pazar Yeri (40009) doğru yönde aktarmasız rota bulmalı
+    // Test 2: Hat 910, Bahribaba (10019) → Montrö (10324) doğru yönde aktarmasız rota bulmalı
     it('dogru yonde aktarmasiz rota bulur (Test 2)', async () => {
-        // 10030 Konak -> 40009 Şirinyer Pazar Yeri, hat 304 yön 1 çalışır
-        const results = await findRoutes('10030', '40009');
-        const direct = results.find(r => r.type === 'direct' && r.routeId === '304');
+        // 10019 Bahribaba -> 10324 Montrö, hat 910 yön 1 çalışır
+        const results = await findRoutes('10019', '10324');
+        const direct = results.find(r => r.type === 'direct' && r.routeId === '910');
         expect(direct).toBeDefined();
     });
 
     // Test 3: Aynı hatta yanlış yön (ters yön) sonuçlara karışmamalı
     it('dogru yonde calisirken yanlis yonu dahil etmez (Test 3)', async () => {
-        const results = await findRoutes('10030', '40009');
-        const direct = results.find(r => r.type === 'direct' && r.routeId === '304');
+        const results = await findRoutes('10019', '10324');
+        const direct = results.find(r => r.type === 'direct' && r.routeId === '910') as DirectRouteResult;
 
         // Önce doğru yönde sonucun gerçekten bulunduğunu garanti et
         expect(direct).toBeDefined();
 
-        const validDirection = (direct as DirectRouteResult).directionId;
-        // Konak -> Şirinyer yönü bulunuyorsa, ters yön (dönüş yönü) sonuçlarda OLMAMALI
-        const oppositeDirection = validDirection === '0' ? '1' : '0';
+        // Yön ID'sini kesin (absolute) bekleyip yön '1' olduğunu doğrulayalım
+        expect(direct.directionId).toBe('1');
+
+        // Ters yön (0) sonuçlarda KESİNLİKLE OLMAMALI
         const wrongDirect = results.find(
-            r => r.type === 'direct' && (r as DirectRouteResult).routeId === '304' && (r as DirectRouteResult).directionId === oppositeDirection
+            r => r.type === 'direct' && r.routeId === '910' && (r as DirectRouteResult).directionId === '0'
         );
         expect(wrongDirect).toBeUndefined();
     });
@@ -44,43 +47,45 @@ describe('Trip Planner Algorithm Tests', () => {
         expect(transferRoute?.type).toBe('transfer');
     });
 
-    // Test 5: Ters yön (Şirinyer → Konak) arandığında doğru routeId/directionId bulunmalı,
-    //          Konak'tan kalkan 304 (yanlış yön) sonuçlara karışmamalı
+    // Test 5: Ters yön arandığında doğru routeId/directionId bulunmalı,
+    //          Yanlış yön sonuçlara karışmamalı
     it('varis sirasi baslangictan onceyse o yonu süzgece takilir (Test 5)', async () => {
-        // 40009 Şirinyer Pazar Yeri -> 10030 Konak (ters yön araması)
-        const results = await findRoutes('40009', '10030');
+        // 10324 -> 10019 (ters yön araması)
+        const results = await findRoutes('10324', '10019');
         expect(results.length).toBeGreaterThan(0);
 
         // Ters yönde sonuç bulunduysa, doğru yönde bir direct rota bekleriz
-        const reverseRoute = results.find(r => r.type === 'direct' && (r as DirectRouteResult).routeId === '304');
-        if (reverseRoute) {
-            // Sonuçta bulunan 304 hatlı rotanın directionId'si Şirinyer→Konak yönünü göstermeli
-            expect((reverseRoute as DirectRouteResult).directionId).toBeDefined();
-        }
+        const reverseRoute = results.find(r => r.type === 'direct' && (r as DirectRouteResult).routeId === '910') as DirectRouteResult;
 
-        // 40009 -> 10030 aramasında, Konak'tan kalkan (10030 biniş durağı olan) 304 hatlı
-        // Gidiş Yönü "yanlış yön" olduğu için sonuçlara KARIŞMAMALIDIR
+        // Önce rotanın var olduğu kesinleşmeli (if kullanılmaz)
+        expect(reverseRoute).toBeDefined();
+
+        // 910'un 10324->10019 güzergahı '0' (diğerinin tersi) olmak zorundadır.
+        expect(reverseRoute.directionId).toBe('0');
+
+        // 10324 -> 10019 aramasında, 10019'dan kalkan (yön '1') yanlış yön olduğu için filtrelenmelidir
         const hasWrongDirection = results.some(
-            r => r.type === 'direct' && r.routeId === '304' && r.boardingStopId === '10030'
+            r => r.type === 'direct' && r.routeId === '910' && (r as DirectRouteResult).directionId === '1'
         );
         expect(hasWrongDirection).toBe(false);
     });
 
     // Test 6: Aynı hat ve yön için yalnızca bir sonuç gelmeli (duplikasyon yok)
     it('duplikasyon rotalar teke indirgenir (Test 6)', async () => {
-        const results = await findRoutes('10030', '40009');
-        const validDirection = (results.find(r => r.type === 'direct' && r.routeId === '304') as any)?.directionId;
-        if (validDirection) {
-            const direct304 = results.filter(
-                r => r.type === 'direct' && r.routeId === '304' && r.directionId === validDirection
-            );
-            expect(direct304.length).toBe(1);
-        }
+        const results = await findRoutes('10019', '10324');
+        const directRoute = results.find(r => r.type === 'direct' && r.routeId === '910') as DirectRouteResult;
+
+        expect(directRoute).toBeDefined();
+
+        const direct910 = results.filter(
+            r => r.type === 'direct' && r.routeId === '910' && (r as DirectRouteResult).directionId === '1'
+        );
+        expect(direct910.length).toBe(1);
     });
 
     // Test 7: Sonuç listesi en fazla 10 rota içermeli
     it('sonuclari maksimium 10 kayit ile limitler (Test 7)', async () => {
-        const results = await findRoutes('10030', '40009');
+        const results = await findRoutes('10019', '10324');
         expect(results.length).toBeLessThanOrEqual(10);
     });
 
@@ -106,11 +111,8 @@ describe('Trip Planner Algorithm Tests', () => {
 
     // Test 10: stop_routes_index ve route_patterns verisi tutarlı olan gerçek bir durak çiftinde
     //          algoritma aktarmasız doğrudan rota üretebilmeli.
-    // DİKKAT (MÜHENDİS NOTU): ESHOT GTFS verisinde 847 Yön/Hat çiftine karşılık tam olarak 847 pattern olduğu,
-    //                         yani hiçbir hatta ikincil bir "alternatif pattern" (varyant) BULUNMADIĞI
-    //                         matematiksel olarak kanıtlanmıştır (847/847 = 1).
-    //                         Bu sebeple "temsilcide olmayan ama varyantta olan" test senaryosu verisel olarak imkansızdır.
-    //                         Tutarlı olan herhangi bir aktarmasız rota, tam kapsamlı pattern testi anlamına gelir.
+    // NOT: Mevcut ESHOT GTFS veritabanında hat ve yön çifti başına tek bir pattern (varyant) bulunmaktadır.
+    // Bu sebeple tutarlı dönen herhangi bir aktarmasız rota araması, sistemin pattern yapısını doğruladığı anlamına gelir.
     it('tutarli veri iceren gercek durak ciftinde aktarmasiz rota uretir (Test 10)', async () => {
         // 10019 Bahribaba -> 10324 Montrö
         // Hat 811, yön 1
@@ -128,20 +130,61 @@ describe('Trip Planner Algorithm Tests', () => {
     });
 
     // Test 11: Ters yön araması yapıldığında, başlangıç civarında yürüyüş gerektiren kombinasyonda
-    //          boarding yürüyüş verisinin ('walkingToBoardingMeters') doğru çekildiği test edilmeli (Faz 11 Aşama 4 Kanıtı).
+    //          boarding yürüyüş verisinin ('walkingToBoardingMeters') doğru çekildiği test edilmeli (Faz 11 Aşama 4 beklentisi).
     it('ters yon aramasinda baslangic civarinda yuruyus gerektiren bir rota bulur (Test 11)', async () => {
         // 41172 -> 10030: Test 8'deki yürüyüş isteyen durağın ters yön araması
         const results = await findRoutes('41172', '10030');
 
         const hasBoardingWalk = results.find(r => r.walkingToBoardingMeters && r.walkingToBoardingMeters > 0);
 
-        if (hasBoardingWalk) {
-            console.log("=== FAZ 11: AŞAMA 4 TERS YÖN BAŞLANGIÇ YÜRÜYÜŞ KANITI ===");
-            console.log(`Original Boarding: 41172, Actual Boarding Stop: ${hasBoardingWalk.actualBoardingStopId}`);
-            console.log(`Walking Distance: ${hasBoardingWalk.walkingToBoardingMeters} meters`);
-        }
-
         expect(hasBoardingWalk).toBeDefined();
+
+        console.log("=== FAZ 11: AŞAMA 4 TERS YÖN BAŞLANGIÇ YÜRÜYÜŞ RAPORU ===");
+        console.log(`Original Boarding: 41172, Actual Boarding Stop: ${(hasBoardingWalk as any).actualBoardingStopId}`);
+        console.log(`Walking Distance: ${(hasBoardingWalk as any).walkingToBoardingMeters} meters`);
+    });
+
+    // Test 12: Sentetik Çoklu-Pattern testi (Faz 11 Aşama 4.3 Senaryosu)
+    it('sentetik coklu-pattern senaryosunda alternatif pattern uzerinden rotayi bulur (Test 12)', async () => {
+        // Geçici (Fixture) veri üretimi:
+        // Varsayalım ki '9999' numaralı hayali bir rotamız var.
+        // Yön 1 için iki farklı varyantı (pattern) olsun.
+        // Pattern 1 (Ana pattern): 90001 -> 90002 -> 90003
+        // Pattern 2 (Alternatif pattern): 90001 -> 90004 -> 90005
+
+        // Runtime bellek manipülasyonu
+        (routePatternsRaw as any)['9999'] = {
+            '1': [
+                { patternId: '9999-1-P1', stopIds: ['90001', '90002', '90003'], tripCount: 50 },
+                { patternId: '9999-1-P2', stopIds: ['90001', '90004', '90005'], tripCount: 10 }
+            ]
+        };
+
+        // Algoritmanın arama yapabilmesi için index'in de doldurulması gerekir
+        (stopRoutesIndexRaw as any)['90001'] = [{ routeId: '9999', directionId: '1', sequence: 0 }];
+        (stopRoutesIndexRaw as any)['90002'] = [{ routeId: '9999', directionId: '1', sequence: 1 }];
+        (stopRoutesIndexRaw as any)['90003'] = [{ routeId: '9999', directionId: '1', sequence: 2 }];
+
+        // Pattern 2'nin indeksleri
+        // 90001 zaten var
+        (stopRoutesIndexRaw as any)['90004'] = [{ routeId: '9999', directionId: '1', sequence: 1 }];
+        (stopRoutesIndexRaw as any)['90005'] = [{ routeId: '9999', directionId: '1', sequence: 2 }];
+
+        // TEST: Başlangıç(90001) durağından, İkinci Pattern'in varış durağına (90005) rota arayalım
+        const results = await findRoutes('90001', '90005');
+        const directRoute = results.find(r => r.type === 'direct' && r.routeId === '9999') as DirectRouteResult;
+
+        // Çoklu pattern ortamında doğru rotanın hatasız (absolute) olarak bulunduğunu doğrula
+        expect(directRoute).toBeDefined();
+        expect(directRoute.directionId).toBe('1');
+
+        // Temizlik (Diğer testler etkilenmesin)
+        delete (routePatternsRaw as any)['9999'];
+        delete (stopRoutesIndexRaw as any)['90001'];
+        delete (stopRoutesIndexRaw as any)['90002'];
+        delete (stopRoutesIndexRaw as any)['90003'];
+        delete (stopRoutesIndexRaw as any)['90004'];
+        delete (stopRoutesIndexRaw as any)['90005'];
     });
 
 });
