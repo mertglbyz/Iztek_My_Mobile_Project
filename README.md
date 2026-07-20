@@ -39,7 +39,7 @@ Uygulamada önceden `stops.json` ismiyle duran düz liste incelenip, GTFS durakl
 - Koordinat farkı bulunan durak: 18
 
 ## Bilinen veri sınırlamaları
-Uygulama baştan aşağı yenilenerek veri seti performansı ölçülü hale getirilmiştir:
+Veri seti performansı açısından alınan önlemler:
 - Performans için sınırlandırma uygulanmıştır.
 - Rate limit riskini azaltmak için cooldown eklenmiştir.
 - Büyük veri setlerinde render yükünü azaltmak için FlatList kullanılmıştır.
@@ -47,6 +47,17 @@ Uygulama baştan aşağı yenilenerek veri seti performansı ölçülü hale get
 
 ## Veri güncelliği notu
 ESHOT GTFS servisi bazı hatlar için anlık veya tam veri sunmayabilir. Kurulan fallback (yedek) mekanizmaları bu durumları sistem çökmeden tolere etse de, uygulamanın doğruluğu ESHOT'un sağladığı arşivin güncelliğine bağlıdır.
+
+> **⚠️ GTFS Takvim Süresi Geçmiş — Fallback Modu Aktif**
+>
+> Mevcut GTFS arşivinin takvim geçerlilik aralığı **Mayıs 2026'da sona ermiştir**. Uygulama Temmuz 2026 ve sonrasında çalıştığında `getServiceIdsByDayType()` fonksiyonu içindeki tarih filtresi (`start_date` / `end_date` kontrolü) otomatik olarak devre dışı bırakılır.
+>
+> Bu fallback modu etkinken:
+> - Sefer saatleri **güncel GTFS takvimine göre hesaplanmaz**; süresi geçmiş eski arşivdeki tüm servisler gösterilir.
+> - Belirlenen haftaiçi/cumartesi/pazar grupları eski servis ID'lerinden türetilir.
+> - Geliştirici konsolunda `[transportApi] ⚠️ GTFS takvimi süresi doldu` uyarısı loglanır.
+>
+> Yeni GTFS arşivi aktarıldığında (`node src/scripts/importGtfs.js`) tarih filtresi otomatik olarak yeniden devreye girer.
 
 ## Sefer Saatlerinin Kapsamı ve Kısıtlamalar
 Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için şu istisnalar tamamen geçerlidir:
@@ -59,15 +70,16 @@ Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için ş
 GTFS Ters İndeksleme tabanlı performanslı bir seyahat planlayıcı (Trip Planner) modülü sisteme başarıyla entegre edilmiştir. Sistem mimarisi aşağıdaki temeller üzerine oturtulmuştur:
 - **Aktarmasız Rotalar:** Aday hatlara ters indeks üzerinden erişildi; aynı hat ve yön üzerindeki direkt seferlerin tespit edilmesi kurgulandı.
 - **Tek Aktarmalı Rotalar:** Array Intersection mantığı ile, iki farklı hattın esnek kesişimine dayanan optimize edilmiş aktarma düğümlerinin hesaplanması.
-- **Kategorik Sıralama:** Listeleme algoritmaları "Aktarmasız" ve "Aktarmalı" olacak şekilde ayrılarak kullanıcının zaman kazancını üst düzeye çıkarmak üzere ayarlandı.
+- **Kategorik Sıralama:** Sonuçlar aktarmasız rotalar önce gösterilecek şekilde sıralandı.
 - **Arama ve Kullanıcı Deneyimi:** Sonuçlar en fazla 10 kayıtla sınırlandırıldı; Dropdown ve arayüz elementleri React Native `FlatList` mimarisine oturtularak rota arama süreleri benchmark dosyasında ölçüldü.
+- **Performans Metrikleri:** Benchmark testleri sonucunda güncel ortalama rota arama süresi **1.03 ms**, zirve (max) arama süresi ise **4.12 ms** olarak ölçülmüştür.
 
 ### Faz 11 Teslimiyet Özeti
 Belirlenen `Teslim Kriterleri` uyarınca sağlanan doğrulamalar:
 - **Ters İndeks Kullanımı:** `importGtfs.js` içerisine gömülü ters indeksleme sistemi yazılmış olup, build anında `stop_routes_index.json` dosyası arka planda üretilmektedir. Ters indeks sayesinde aday hatlara doğrudan erişilerek rota arama alanı ve hesaplama maliyeti azaltılmıştır.
 - **Hata Toleransı ve UI Kartları:** `directions.tsx` üzerinden ekran durumları gerçek GTFS verisi üzerinden modellenerek aktarmalı, aktarmasız ve bulunamadı durumlarına reaksiyon veren UI mimarisi oturtulmuştur.
 - **TypeScript Derlemesi:** Rota planlayıcı sınıfları type-safe yapılmış olup, `npx tsc --noEmit` sonucu terminalde izlenmiş ve test edilen senaryolarda sonuç üretildi.
-- **Detaylı Algoritma Testleri:** Çapraz geçiş, aynı durak vb. tüm kilitlenme senaryoları belgelenerek `docs/trip-planner-tests.md` dosyasıyla projeye eklenmiştir.
+- **Detaylı Algoritma Testleri:** Belirlenen 11 algoritma senaryosu otomatik testlerle kontrol edildi ve `docs/trip-planner-tests.md` dosyasıyla projeye eklenmiştir.
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. Terminalden `npm install` komutuyla Expo ve React bağımlılıklarını kurun.

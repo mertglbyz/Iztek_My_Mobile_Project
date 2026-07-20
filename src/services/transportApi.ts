@@ -298,13 +298,41 @@ export const getServiceIdsByDayType = () => {
     }
   });
 
-  // Eğer veritabanındaki en güncel takvim bile geçmişte kaldıysa (GTFS güncel değilse)
-  // Sistemin boş dönmemesi için tarih kısıtlamasını esnet (Graceful Fallback)
-  const isDataExpired = maxEndDate > 0 && currentDate > maxEndDate;
+  // ========================================================================
+  // GTFS TAKVİM GEÇERLİLİK KONTROLÜ
+  // ========================================================================
+  // GTFS takvimi güncel değilse (tüm service_id'lerin end_date'i geçmişte
+  // kalmışsa) iki seçenek mevcuttur:
+  //
+  //  A) Tüm servisleri geçersiz say → uygulama boş görünür
+  //  B) Tarih filtresini atla, eski programı göster (Graceful Fallback)
+  //
+  // Bu uygulama B seçeneğini uygular. Mevcut GTFS arşivinin son bitiş tarihi
+  // Mayıs 2026'dır; ancak uygulama Temmuz 2026+ tarihinde çalıştığında
+  // isGtfsCalendarExpired = true olur ve tarih filtresi devre dışı kalır.
+  //
+  // ⚠️  UYARI: Bu fallback etkin olduğunda kullanıcıya sunulan sefer saatleri
+  //     GÜNCEL GTFS TAKVİMİNDEN DEĞİL, SÜRESİ GEÇMİŞ ESKİ ARŞİVDEN gelir.
+  //     Bu durum README > "Veri güncelliği notu" bölümünde kullanıcıya açıkça
+  //     bildirilmektedir.
+  // ========================================================================
+  //     bildirilmektedir.
+  // ========================================================================
+  const isGtfsCalendarExpired = checkIsGtfsCalendarExpired();
+
+  if (isGtfsCalendarExpired) {
+    // Geliştirici konsoluna uyarı: fallback'in devrede olduğunu açıkça belirt
+    console.warn(
+      `[transportApi] ⚠️ GTFS takvimi süresi doldu. ` +
+      `Son geçerli tarih: ${maxEndDate}, Bugün: ${currentDate}. ` +
+      `Tarih filtresi devre dışı — tüm servisler fallback olarak gösteriliyor.`
+    );
+  }
 
   Object.values(calendar).forEach(s => {
-    // Madde 10: start_date ve end_date kontrolu (tarih disinda kalanlari ele)
-    if (s.start_date && s.end_date && !isDataExpired) {
+    // start_date / end_date kontrolü: GTFS takvimi hâlâ geçerliyse filtrele.
+    // isGtfsCalendarExpired = true ise bu koşul atlanır (fallback modu aktif).
+    if (s.start_date && s.end_date && !isGtfsCalendarExpired) {
       if (currentDate < Number(s.start_date) || currentDate > Number(s.end_date)) {
         return;
       }
@@ -320,18 +348,18 @@ export const getServiceIdsByDayType = () => {
     if (isSunday) groups.sunday.push(s.service_id);
   });
 
-  return groups;
+  return { groups, isFallback: isGtfsCalendarExpired };
 };
 
 /**
  * 2. Belirtilen Hat ve Yön için Gün gruplarına göre Tüm Sefer Saatlerini getirir.
  */
 export const getAllDepartures = (routeId: string | number, directionId: string) => {
-  const serviceGroups = getServiceIdsByDayType();
+  const { groups: serviceGroups, isFallback } = getServiceIdsByDayType();
   const departuresData: any = routeDeparturesRaw as any;
   const routeDirData = departuresData[String(routeId)]?.[directionId];
 
-  if (!routeDirData) return { weekday: [], saturday: [], sunday: [] };
+  if (!routeDirData) return { weekday: [], saturday: [], sunday: [], isFallback };
 
   const extractTimes = (serviceIds: string[]) => {
     const times = new Set<string>();
@@ -345,5 +373,33 @@ export const getAllDepartures = (routeId: string | number, directionId: string) 
     weekday: extractTimes(serviceGroups.weekday),
     saturday: extractTimes(serviceGroups.saturday),
     sunday: extractTimes(serviceGroups.sunday),
+    isFallback
   };
+};
+
+/**
+ * GTFS Takviminin süresinin dolup dolmadığını (tüm end_date'lerin geçmişte kalıp kalmadığını) kontrol eder.
+ * @returns boolean
+ */
+export const checkIsGtfsCalendarExpired = (): boolean => {
+  const calendar: Record<string, any> = serviceCalendarRaw as any;
+  const today = new Date();
+  const currentDate = Number(
+    today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0')
+  );
+
+  let maxEndDate = 0;
+
+  Object.values(calendar).forEach((s: any) => {
+    if (s.end_date) {
+      const eDate = Number(s.end_date);
+      if (eDate > maxEndDate) {
+        maxEndDate = eDate;
+      }
+    }
+  });
+
+  return maxEndDate > 0 && currentDate > maxEndDate;
 };

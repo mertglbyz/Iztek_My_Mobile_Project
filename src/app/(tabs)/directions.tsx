@@ -1,7 +1,7 @@
 import ScreenHeader from '@/components/common/ScreenHeader';
 import { BorderRadius, Colors, FontSizes, FontWeights, Shadows, Spacing } from '@/constants/theme';
 import plannerStopsRaw from '@/data/gtfs/planner_stops.json';
-import { getAllRoutes } from '@/services/transportApi';
+import { checkIsGtfsCalendarExpired, getAllRoutes } from '@/services/transportApi';
 import { DirectRouteResult, findRoutes, TransferRouteResult, TripPlanResult } from '@/services/tripPlanner';
 import { BusStop } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,8 @@ export default function DirectionsScreen() {
 
     const [originStop, setOriginStop] = useState<BusStop | null>(null);
     const [destStop, setDestStop] = useState<BusStop | null>(null);
+
+    const [isFallback, setIsFallback] = useState(false);
 
     const [originSearch, setOriginSearch] = useState('');
     const [destSearch, setDestSearch] = useState('');
@@ -39,6 +41,8 @@ export default function DirectionsScreen() {
         }));
         setStops(mapped);
         getAllRoutes().then(setRoutesCache);
+
+        setIsFallback(checkIsGtfsCalendarExpired());
     }, []);
 
     const handleSearchInput = (text: string, type: 'origin' | 'dest') => {
@@ -337,6 +341,14 @@ export default function DirectionsScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader title="Nasıl Giderim" subtitle="GTFS Tabanlı Rota Planlama" />
+
+            {isFallback && (
+                <View style={{ backgroundColor: Colors.warningSoft, padding: Spacing.sm, marginHorizontal: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+                    <Text style={{ color: Colors.warning, fontSize: FontSizes.sm, textAlign: 'center' }}>
+                        ⚠️ GTFS takvim süresi geçmiş olduğu için eski program gösteriliyor.
+                    </Text>
+                </View>
+            )}
 
             <FlatList
                 contentContainerStyle={styles.scrollContent}

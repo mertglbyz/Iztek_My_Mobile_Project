@@ -1,6 +1,6 @@
 # Faz 11 - Rota Planlayıcı Otomatik Test Senaryoları Raporu
 
-Gerçek GTFS ve Optimize edilmiş Ters İndeksleme algoritması üzerinde aşağıdaki 10 temel senaryo simüle edilmiş ve Jest kullanılarak otomatik testlerden başarıyla geçmiştir:
+Gerçek GTFS ve Optimize edilmiş Ters İndeksleme algoritması üzerinde aşağıdaki 11 temel senaryo simüle edilmiş ve Jest kullanılarak otomatik testlerden başarıyla geçmiştir:
 
 ## Test 1 - Aynı Durak Seçimi
 - Aynı durak seçilirse boş liste döner (Test 1). 
@@ -13,7 +13,7 @@ Gerçek GTFS ve Optimize edilmiş Ters İndeksleme algoritması üzerinde aşağ
 - Doğru yönde çalışırken ters yönü dahil etmez, yön süzgeci aktiftir.
 
 ## Test 4 - Uzak Duraklar Aktarma Taraması
-- Uzak duraklar arası aktarma (veya bulamama) tarandığında çökmeksizin (hata vermeksizin) sonuç veya boş liste dönmesi sağlanır.
+- Uzak duraklar arası arama yapıldığında en az bir `type: 'transfer'` sonucu döndürülmesi beklenir. Aktarma gerektiren durak çiftlerinde algoritma çökmeden aktarmalı rota üretebilmeli ve sonucun `type` alanı açıkça `'transfer'` olmalıdır.
 
 ## Test 5 - Dönüş Yönü ve Ters Yön Seçiciliği
 - Varış sırası başlangıçtan önceyse (startIdx < endIdx formülüne uymazsa) o yön süzgece takılır ve doğru sıralı güzergâh listelenir.
@@ -32,5 +32,8 @@ Gerçek GTFS ve Optimize edilmiş Ters İndeksleme algoritması üzerinde aşağ
 
 ## Test 10 - Pattern Varyantlarında Destek
 - Pattern varyantlarında (route pattern) düzgün çalışır. Temsilci hat dizilimi dışındaki diğer alt yol ayrımlarını da kapsayacak şekilde güvenli ve doğru çalışır.
+
+## Test 11 - Ters Yön Aramasında Başlangıç Civarı Yürüyüş
+- Ters yön araması yapıldığında, başlangıç civarında yürüyüş gerektiren kombinasyonda boarding yürüyüş verisinin (`walkingToBoardingMeters`) doğru çekildiği tespit edildi (Faz 11 Aşama 4 Kanıtı).
 
 Tüm testler yazılmış olup, **automated_test_results.txt** dosyasına aktarılmıştır. Bütün testler ✅ `PASS` sonucunu almıştır.

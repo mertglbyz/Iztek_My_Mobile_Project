@@ -445,6 +445,17 @@ export default function RouteDetailScreen() {
                             <View style={[styles.sectionContainer, { paddingBottom: Spacing.md }]}>
                                 <Text style={styles.sectionTitle}>Sefer Saatleri</Text>
 
+                                {allDepartures.isFallback && (
+                                    <View style={{ backgroundColor: '#fff3cd', padding: 12, borderRadius: 8, marginTop: 8, borderWidth: 1, borderColor: '#ffe69c' }}>
+                                        <Text style={{ fontSize: 13, color: '#664d03', fontWeight: 'bold' }}>
+                                            ⚠️ GTFS Takvim Süresi Geçmiş
+                                        </Text>
+                                        <Text style={{ fontSize: 12, color: '#664d03', marginTop: 4 }}>
+                                            Güncel takvim süresi dolduğu için eski sefer programı gösterilmektedir. Saatler gerçeği yansıtmayabilir.
+                                        </Text>
+                                    </View>
+                                )}
+
                                 {/* GÜN TİPİ SEKMELERİ */}
                                 <View style={styles.dayTabsContainer}>
                                     <TouchableOpacity style={[styles.dayTab, selectedDayType === 'weekday' && styles.dayTabActive]} onPress={() => setSelectedDayType('weekday')}>
