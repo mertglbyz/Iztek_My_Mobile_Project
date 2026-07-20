@@ -1,4 +1,40 @@
-﻿
-> durak-yakinimda@1.0.0 test
-> jest
+﻿PASS src/__tests__/tripPlanner.test.ts
+  Trip Planner Algorithm Tests
+    √ aynı durak secilirse bos doner (Test 1)
+    √ dogru yonde aktarmasiz rota bulur (Test 2)
+    √ dogru yonde calisirken yanlis yonu dahil etmez (Test 3)
+    √ uzak duraklar arasi en az bir tek aktarmali rota bulur (Test 4)
+    √ varis sirasi baslangictan onceyse o yonu süzgece takilir (Test 5)
+    √ duplikasyon rotalar teke indirgenir (Test 6)
+    √ sonuclari maksimium 10 kayit ile limitler (Test 7)
+    √ 150m icerisindeki yakin duraklari adaya ekler (Test 8)
+    √ 150m siniri uzerindeki uzak duraklar adaya alinmaz (Test 9)
+    √ tutarli veri iceren gercek durak ciftinde aktarmasiz rota uretir (Test 10)
+    √ ters yon aramasinda baslangic civarinda yuruyus gerektiren bir rota bulur (Test 11)
 
+  ● Console
+
+    console.log
+      === FAZ 11: AŞAMA 4 TERS YÖN BAŞLANGIÇ YÜRÜYÜŞ KANITI ===
+
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:139:21)
+
+    console.log
+      Original Boarding: 41172, Actual Boarding Stop: 41177
+
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:140:21)
+
+    console.log
+      Walking Distance: 119 meters
+
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:141:21)
+
+PASS src/__tests__/benchmark.test.ts
+  Trip Planner Benchmark
+    √ creates benchmark report for 10 pairs with 4 iterations
+
+Test Suites: 2 passed, 2 total
+Tests:       12 passed, 12 total
+Snapshots:   0 total
+Time:        5.367 s
+Ran all test suites matching /src\\__tests__\\tripPlanner.test.ts|src\\__tests__\\benchmark.test.ts/i.

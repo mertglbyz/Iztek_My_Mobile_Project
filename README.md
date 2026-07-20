@@ -67,19 +67,18 @@ Uygulamada gösterilen "Hafta İçi, Cumartesi ve Pazar" sefer saatleri için ş
 - Belirtilen saatler kesinlikle **canlı araç tahmini (ETA) değildir**; resmi planlanan program listesidir.
 
 ## Rota Planlama (Nasıl Giderim)
-GTFS Ters İndeksleme tabanlı performanslı bir seyahat planlayıcı (Trip Planner) modülü sisteme başarıyla entegre edilmiştir. Sistem mimarisi aşağıdaki temeller üzerine oturtulmuştur:
+Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü tasarlanmıştır. Sistemin kapsadığı konular:
 - **Aktarmasız Rotalar:** Aday hatlara ters indeks üzerinden erişildi; aynı hat ve yön üzerindeki direkt seferlerin tespit edilmesi kurgulandı.
 - **Tek Aktarmalı Rotalar:** Array Intersection mantığı ile, iki farklı hattın esnek kesişimine dayanan optimize edilmiş aktarma düğümlerinin hesaplanması.
 - **Kategorik Sıralama:** Sonuçlar aktarmasız rotalar önce gösterilecek şekilde sıralandı.
-- **Arama ve Kullanıcı Deneyimi:** Sonuçlar en fazla 10 kayıtla sınırlandırıldı; Dropdown ve arayüz elementleri React Native `FlatList` mimarisine oturtularak rota arama süreleri benchmark dosyasında ölçüldü.
-- **Performans Metrikleri:** Benchmark testleri sonucunda güncel ortalama rota arama süresi **1.03 ms**, zirve (max) arama süresi ise **4.12 ms** olarak ölçülmüştür.
+- **Arama ve Kullanıcı Deneyimi:** Sonuçlar belirlenen limit dahilinde listelenmiş; arayüz elementleri React Native `FlatList` mimarisine oturtulmuştur.
+- **Performans Metrikleri:** Benchmark testleri sonucunda güncel ortalama rota arama süresi **1.12 ms**, zirve (max) arama süresi ise **7.76 ms** olarak ölçülmüştür.
 
-### Faz 11 Teslimiyet Özeti
-Belirlenen `Teslim Kriterleri` uyarınca sağlanan doğrulamalar:
-- **Ters İndeks Kullanımı:** `importGtfs.js` içerisine gömülü ters indeksleme sistemi yazılmış olup, build anında `stop_routes_index.json` dosyası arka planda üretilmektedir. Ters indeks sayesinde aday hatlara doğrudan erişilerek rota arama alanı ve hesaplama maliyeti azaltılmıştır.
-- **Hata Toleransı ve UI Kartları:** `directions.tsx` üzerinden ekran durumları gerçek GTFS verisi üzerinden modellenerek aktarmalı, aktarmasız ve bulunamadı durumlarına reaksiyon veren UI mimarisi oturtulmuştur.
-- **TypeScript Derlemesi:** Rota planlayıcı sınıfları type-safe yapılmış olup, `npx tsc --noEmit` sonucu terminalde izlenmiş ve test edilen senaryolarda sonuç üretildi.
-- **Detaylı Algoritma Testleri:** Belirlenen 11 algoritma senaryosu otomatik testlerle kontrol edildi ve `docs/trip-planner-tests.md` dosyasıyla projeye eklenmiştir.
+### Faz 11 Kapanış Notları
+Gerçekleştirilen teknik denetimler:
+- **Ters İndeks Kullanımı:** `importGtfs.js` içerisindeki indeksleme fonksiyonlarıyla derleme anında `stop_routes_index.json` dosyası oluşturulmaktadır. Bu yapı aday hatlara erişimde kullanılmaktadır.
+- **UI Fallback Gösterimi:** `directions.tsx` üzerinde, veri süresi biten takvim geçerlilikleri için uyarı bildirebilen arayüz öğeleri eklendi.
+- **Değerlendirme Testleri:** Belirlenen 11 temel senaryo, ilgili pattern kısıtlamaları baz alınarak otomatik test edilmiş ve `docs/trip-planner-tests.md` dosyasına kaydedilmiştir.
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. Terminalden `npm install` komutuyla Expo ve React bağımlılıklarını kurun.
