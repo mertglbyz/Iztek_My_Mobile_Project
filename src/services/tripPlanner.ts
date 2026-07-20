@@ -1,4 +1,5 @@
 import nearbyStopsIndexRaw from '@/data/gtfs/nearby_stops_index.json';
+import patternTripShapeIndexRaw from '@/data/gtfs/pattern_trip_shape_index.json';
 import routePatternsRaw from '@/data/gtfs/route_patterns.json';
 import stopRoutesIndexRaw from '@/data/gtfs/stop_routes_index.json';
 
@@ -19,29 +20,54 @@ interface NearbyStopInfo {
     distanceMeters: number;
 }
 
+interface PatternContext {
+    routeId: string;
+    directionId: string;
+    representativeTripId: string;
+    shapeId: string | null;
+}
+
 const stopRoutesIndex: Record<string, RouteSequenceInfo[]> = stopRoutesIndexRaw as any;
 const routePatterns: Record<string, Record<string, PatternInfo[]>> = routePatternsRaw as any;
 const nearbyStopsIndex: Record<string, NearbyStopInfo[]> = nearbyStopsIndexRaw as any;
+const patternTripShapeIndex: Record<string, PatternContext> = patternTripShapeIndexRaw as any;
 
 export interface DirectRouteResult {
+    resultId: string;
     type: 'direct';
     routeId: string;
     directionId: string;
+    patternId: string;
+    tripId: string;
+    shapeId: string | null;
+    segmentStopIds: string[];
     boardingStopId: string;
     alightingStopId: string;
     actualBoardingStopId?: string;
     actualAlightingStopId?: string;
     walkingToBoardingMeters?: number;
     walkingFromAlightingMeters?: number;
+    totalWalkingMeters: number;
     stopCount: number;
+    totalStopCount: number;
+    transferCount: number;
 }
 
 export interface TransferRouteResult {
+    resultId: string;
     type: 'transfer';
     firstRouteId: string;
     firstDirectionId: string;
     secondRouteId: string;
     secondDirectionId: string;
+    firstPatternId: string;
+    secondPatternId: string;
+    firstTripId: string;
+    secondTripId: string;
+    firstShapeId: string | null;
+    secondShapeId: string | null;
+    firstSegmentStopIds: string[];
+    secondSegmentStopIds: string[];
     boardingStopId: string;
     transferStopId: string;
     alightingStopId: string;
@@ -49,9 +75,11 @@ export interface TransferRouteResult {
     actualAlightingStopId?: string;
     walkingToBoardingMeters?: number;
     walkingFromAlightingMeters?: number;
+    totalWalkingMeters: number;
     firstSegmentStopCount: number;
     secondSegmentStopCount: number;
     totalStopCount: number;
+    transferCount: number;
 }
 
 export type TripPlanResult = DirectRouteResult | TransferRouteResult;
@@ -111,20 +139,34 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
                                 const totalWalk = startCand.walkMeters + endCand.walkMeters;
 
                                 const existing = directMap.get(dupKey);
-                                const existingWalk = existing ? ((existing.walkingToBoardingMeters || 0) + (existing.walkingFromAlightingMeters || 0)) : Infinity;
+                                const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
 
                                 if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && (endIdx - startIdx) < existing.stopCount)) {
+                                    const tripContext = patternTripShapeIndex[pattern.patternId];
+                                    const segmentStopIds = pattern.stopIds.slice(startIdx, endIdx + 1);
+
+                                    // Deterministik resultId
+                                    const resultId = `${start.routeId}_${start.directionId}_${pattern.patternId}_${startCand.id}_${endCand.id}`;
+
                                     directMap.set(dupKey, {
+                                        resultId,
                                         type: 'direct',
                                         routeId: start.routeId,
                                         directionId: start.directionId,
+                                        patternId: pattern.patternId,
+                                        tripId: tripContext?.representativeTripId || '',
+                                        shapeId: tripContext?.shapeId || null,
+                                        segmentStopIds,
                                         boardingStopId: startStopId,
                                         alightingStopId: endStopId,
                                         actualBoardingStopId: startCand.id !== startStopId ? startCand.id : undefined,
                                         actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
                                         walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
                                         walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
-                                        stopCount: endIdx - startIdx
+                                        totalWalkingMeters: totalWalk,
+                                        stopCount: endIdx - startIdx,
+                                        totalStopCount: endIdx - startIdx,
+                                        transferCount: 0
                                     });
                                 }
                                 break;
@@ -190,15 +232,33 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
                                 const dupKey = `${start.routeId}-${start.directionId}-${end.routeId}-${end.directionId}`;
                                 const totalWalk = startCand.walkMeters + endCand.walkMeters;
                                 const existing = transferMap.get(dupKey);
-                                const existingWalk = existing ? ((existing.walkingToBoardingMeters || 0) + (existing.walkingFromAlightingMeters || 0)) : Infinity;
+                                const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
 
                                 if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && bestTotalStops < existing.totalStopCount)) {
+                                    const firstTripContext = patternTripShapeIndex[startPattern.patternId];
+                                    const secondTripContext = patternTripShapeIndex[endPattern.patternId];
+
+                                    const firstSegmentStopIds = startPattern.stopIds.slice(startIdx, startPattern.stopIds.indexOf(bestTransferStopId) + 1);
+                                    const secondSegmentStopIds = endPattern.stopIds.slice(endPattern.stopIds.indexOf(bestTransferStopId), endIdx + 1);
+
+                                    // Deterministik resultId
+                                    const resultId = `${start.routeId}_${start.directionId}_${startPattern.patternId}_${startCand.id}_${bestTransferStopId}_${end.routeId}_${end.directionId}_${endPattern.patternId}_${endCand.id}`;
+
                                     transferMap.set(dupKey, {
+                                        resultId,
                                         type: 'transfer',
                                         firstRouteId: start.routeId,
                                         firstDirectionId: start.directionId,
                                         secondRouteId: end.routeId,
                                         secondDirectionId: end.directionId,
+                                        firstPatternId: startPattern.patternId,
+                                        secondPatternId: endPattern.patternId,
+                                        firstTripId: firstTripContext?.representativeTripId || '',
+                                        secondTripId: secondTripContext?.representativeTripId || '',
+                                        firstShapeId: firstTripContext?.shapeId || null,
+                                        secondShapeId: secondTripContext?.shapeId || null,
+                                        firstSegmentStopIds,
+                                        secondSegmentStopIds,
                                         boardingStopId: startStopId,
                                         transferStopId: bestTransferStopId,
                                         alightingStopId: endStopId,
@@ -206,9 +266,11 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
                                         actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
                                         walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
                                         walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
+                                        totalWalkingMeters: totalWalk,
                                         firstSegmentStopCount: firstSegmentStops,
                                         secondSegmentStopCount: secondSegmentStops,
-                                        totalStopCount: bestTotalStops
+                                        totalStopCount: bestTotalStops,
+                                        transferCount: 1
                                     });
                                 }
                             }

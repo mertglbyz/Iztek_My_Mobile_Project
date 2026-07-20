@@ -274,7 +274,10 @@ async function runImport() {
             routePatterns[routeShortName][directionId][seqKey] = {
                 patternId: `${routeShortName}-${directionId}-${Object.keys(routePatterns[routeShortName][directionId]).length + 1}`,
                 stopIds: stopIds,
-                tripCount: 0
+                tripCount: 0,
+                // Faz 12: Relationship keeping
+                representativeTripId: tripId,
+                shapeId: trip.shapeId || null
             };
         }
         routePatterns[routeShortName][directionId][seqKey].tripCount++;
@@ -282,6 +285,7 @@ async function runImport() {
 
     // seqKey bazlı objeyi array'e dönüştür ve tripCount'a göre sırala (en çok kullanılan en üstte)
     const routePatternsOutput = {};
+    const patternTripShapeIndex = {}; // Faz 12 Madde 2
     let routeDirectionCombinationCount = 0;
     let multiPatternRouteDirectionCount = 0;
     const multiPatternList = [];
@@ -290,12 +294,30 @@ async function runImport() {
         routePatternsOutput[rId] = {};
         for (const dId in routePatterns[rId]) {
             const patterns = Object.values(routePatterns[rId][dId]).sort((a, b) => b.tripCount - a.tripCount);
-            routePatternsOutput[rId][dId] = patterns;
+
+            // Generate patternTripShapeIndex simultaneously and clean output for route_patterns.json
+            const cleanedPatterns = [];
+            for (const p of patterns) {
+                patternTripShapeIndex[p.patternId] = {
+                    routeId: rId,
+                    directionId: dId,
+                    representativeTripId: p.representativeTripId,
+                    shapeId: p.shapeId
+                };
+
+                cleanedPatterns.push({
+                    patternId: p.patternId,
+                    stopIds: p.stopIds,
+                    tripCount: p.tripCount
+                });
+            }
+
+            routePatternsOutput[rId][dId] = cleanedPatterns;
 
             routeDirectionCombinationCount++;
-            if (patterns.length > 1) {
+            if (cleanedPatterns.length > 1) {
                 multiPatternRouteDirectionCount++;
-                multiPatternList.push(`${rId} (Yön: ${dId}) - ${patterns.length} Farklı Pattern`);
+                multiPatternList.push(`${rId} (Yön: ${dId}) - ${cleanedPatterns.length} Farklı Pattern`);
             }
         }
     }
@@ -417,6 +439,7 @@ async function runImport() {
     fs.writeFileSync(path.join(OUT_DIR, 'trips_index.json'), JSON.stringify(representativeTrips), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'stop_routes_index.json'), JSON.stringify(stopRoutesIndex), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_patterns.json'), JSON.stringify(routePatternsOutput), 'utf8');
+    fs.writeFileSync(path.join(OUT_DIR, 'pattern_trip_shape_index.json'), JSON.stringify(patternTripShapeIndex), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'service_calendar.json'), JSON.stringify(serviceCalendar), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'route_departures.json'), JSON.stringify(routeDepartures), 'utf8');
     fs.writeFileSync(path.join(OUT_DIR, 'gtfs_stops.json'), JSON.stringify(gtfsStops), 'utf8');
