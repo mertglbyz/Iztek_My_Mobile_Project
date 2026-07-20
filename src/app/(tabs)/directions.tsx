@@ -130,7 +130,10 @@ export default function DirectionsScreen() {
         if (trip.type === 'direct') {
             const direct = trip as DirectRouteResult;
             return (
-                <View style={styles.tripCard}>
+                <TouchableOpacity
+                    style={styles.tripCard}
+                    onPress={() => router.push(`/trip/${direct.resultId}?startStopId=${originStop?.id || ''}&endStopId=${destStop?.id || ''}` as any)}
+                >
                     <View style={styles.bestBadge}>
                         <Text style={styles.bestBadgeText}>Aktarmasız</Text>
                     </View>
@@ -166,12 +169,15 @@ export default function DirectionsScreen() {
                     <View style={styles.linesRow}>
                         <Text style={styles.stopCountText}>{direct.stopCount} durak mesafe</Text>
                     </View>
-                </View>
+                </TouchableOpacity>
             );
         } else {
             const transfer = trip as TransferRouteResult;
             return (
-                <View style={styles.tripCard}>
+                <TouchableOpacity
+                    style={styles.tripCard}
+                    onPress={() => router.push(`/trip/${transfer.resultId}?startStopId=${originStop?.id || ''}&endStopId=${destStop?.id || ''}` as any)}
+                >
                     <View style={[styles.bestBadge, { backgroundColor: Colors.warningSoft }]}>
                         <Text style={[styles.bestBadgeText, { color: Colors.warning }]}>1 Aktarma</Text>
                     </View>
@@ -219,7 +225,7 @@ export default function DirectionsScreen() {
                     <View style={styles.linesRow}>
                         <Text style={styles.stopCountText}>Toplam {transfer.totalStopCount} durak mesafe</Text>
                     </View>
-                </View>
+                </TouchableOpacity>
             );
         }
     };
