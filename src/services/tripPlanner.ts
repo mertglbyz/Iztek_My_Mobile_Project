@@ -281,24 +281,37 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
         }
     }
 
-    // 3. KATEGORİK SIRALAMA (Önce Aktarmasız, Sonra Aktarmalı)
+    // 3. KATEGORİK SIRALAMA — Gereksinim Sırasıyla (Maddeler ayrı ayrı uygulanır)
+    // Kural 1: Aktarmasız rotalar > Tek aktarmalı rotalar
+    // Kural 2: Daha az yaklaşık yürüyüş mesafesi
+    // Kural 3: Daha az toplam durak sayısı
+    // Kural 4: Eşitlik durumunda hat numarasına göre alfabetik
     const allResults: TripPlanResult[] = [...Array.from(directMap.values()), ...Array.from(transferMap.values())];
 
     allResults.sort((a, b) => {
-        // Öncelik 1: Kategori (Direct rotalar her zaman üstte olmalı)
+        // Kural 1: Aktarmasız rotalar önce
         if (a.type !== b.type) {
             return a.type === 'direct' ? -1 : 1;
         }
 
-        // Öncelik 2: Toplam yürüme mesafesi
+        // Kural 2: Daha az yürüyüş mesafesi önce
         const walkA = (a.walkingToBoardingMeters || 0) + (a.walkingFromAlightingMeters || 0);
         const walkB = (b.walkingToBoardingMeters || 0) + (b.walkingFromAlightingMeters || 0);
-        if (walkA !== walkB) return walkA - walkB;
+        if (walkA !== walkB) {
+            return walkA - walkB;
+        }
 
-        // Öncelik 3: Aynı kategoride ve aynı yürüme mesafesindeyse Durak Sayısı
+        // Kural 3: Daha az toplam durak sayısı önce
         const stopsA = a.type === 'direct' ? a.stopCount : a.totalStopCount;
         const stopsB = b.type === 'direct' ? b.stopCount : b.totalStopCount;
-        return stopsA - stopsB;
+        if (stopsA !== stopsB) {
+            return stopsA - stopsB;
+        }
+
+        // Kural 4: Eşitlik durumunda hat numarasına göre alfabetik
+        const idA = a.type === 'direct' ? a.routeId : a.firstRouteId;
+        const idB = b.type === 'direct' ? b.routeId : b.firstRouteId;
+        return idA.localeCompare(idB);
     });
 
     // 4. SONUÇ LİMİTLEME

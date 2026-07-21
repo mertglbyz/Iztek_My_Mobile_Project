@@ -134,8 +134,15 @@ export default function DirectionsScreen() {
                     style={styles.tripCard}
                     onPress={() => router.push(`/trip/${direct.resultId}?startStopId=${originStop?.id || ''}&endStopId=${destStop?.id || ''}` as any)}
                 >
-                    <View style={styles.bestBadge}>
-                        <Text style={styles.bestBadgeText}>Aktarmasız</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                        {idx === 0 && (
+                            <View style={[styles.bestBadge, { backgroundColor: Colors.success, marginBottom: 0 }]}>
+                                <Text style={[styles.bestBadgeText, { color: Colors.white }]}>🌟 Önerilen</Text>
+                            </View>
+                        )}
+                        <View style={[styles.bestBadge, { marginBottom: 0 }]}>
+                            <Text style={styles.bestBadgeText}>Aktarmasız</Text>
+                        </View>
                     </View>
                     <TouchableOpacity
                         style={styles.tripHeader}
@@ -178,8 +185,15 @@ export default function DirectionsScreen() {
                     style={styles.tripCard}
                     onPress={() => router.push(`/trip/${transfer.resultId}?startStopId=${originStop?.id || ''}&endStopId=${destStop?.id || ''}` as any)}
                 >
-                    <View style={[styles.bestBadge, { backgroundColor: Colors.warningSoft }]}>
-                        <Text style={[styles.bestBadgeText, { color: Colors.warning }]}>1 Aktarma</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                        {idx === 0 && (
+                            <View style={[styles.bestBadge, { backgroundColor: Colors.success, marginBottom: 0 }]}>
+                                <Text style={[styles.bestBadgeText, { color: Colors.white }]}>🌟 Önerilen</Text>
+                            </View>
+                        )}
+                        <View style={[styles.bestBadge, { backgroundColor: Colors.warningSoft, marginBottom: 0 }]}>
+                            <Text style={[styles.bestBadgeText, { color: Colors.warning }]}>1 Aktarma</Text>
+                        </View>
                     </View>
 
                     <TouchableOpacity onPress={() => router.push(`/route/${transfer.firstRouteId}`)}>
@@ -352,6 +366,14 @@ export default function DirectionsScreen() {
                 <View style={{ backgroundColor: Colors.warningSoft, padding: Spacing.sm, marginHorizontal: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
                     <Text style={{ color: Colors.warning, fontSize: FontSizes.sm, textAlign: 'center' }}>
                         ⚠️ GTFS takvim süresi geçmiş olduğu için eski program gösteriliyor.
+                    </Text>
+                </View>
+            )}
+
+            {searchState === 'results' && tripResults.length > 0 && (
+                <View style={{ backgroundColor: Colors.primarySoft, padding: Spacing.sm, marginHorizontal: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
+                    <Text style={{ color: Colors.primary, fontSize: FontSizes.sm, textAlign: 'center' }}>
+                        ℹ️ Bu sonuçlar planlanmış (statik) GTFS verileridir. Canlı trafik yoğunluğunu veya anlık varış sürelerini (ETA) içermez.
                     </Text>
                 </View>
             )}

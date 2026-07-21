@@ -1,6 +1,6 @@
 import routePatternsRaw from '@/data/gtfs/route_patterns.json';
 import stopRoutesIndexRaw from '@/data/gtfs/stop_routes_index.json';
-import { DirectRouteResult, findRoutes } from '@/services/tripPlanner';
+import { DirectRouteResult, findRoutes, TransferRouteResult } from '@/services/tripPlanner';
 
 describe('Trip Planner Algorithm Tests', () => {
 
@@ -185,6 +185,63 @@ describe('Trip Planner Algorithm Tests', () => {
         delete (stopRoutesIndexRaw as any)['90003'];
         delete (stopRoutesIndexRaw as any)['90004'];
         delete (stopRoutesIndexRaw as any)['90005'];
+    });
+
+    // Test 13: Aynı rota sonucu her çalıştırmada aynı resultId üretir (Deterministik)
+    it('ayni rota sonucu ayni resultId degerini uretir (Test 13)', async () => {
+        const results1 = await findRoutes('10019', '10324');
+        const results2 = await findRoutes('10019', '10324');
+        expect(results1[0].resultId).toBe(results2[0].resultId);
+    });
+
+    // Test 14: Aktarmasız rota sıralamada aktarmalı rotadan önce gelir
+    it('aktarmasiz rota siralamada aktarmali rotadan once gelir (Test 14)', async () => {
+        const results = await findRoutes('10019', '10324'); // Hem aktarmasız hem belki aktarmalı vardır
+        const directIndices = results.map((r, i) => r.type === 'direct' ? i : -1).filter(i => i >= 0);
+        const transferIndices = results.map((r, i) => r.type === 'transfer' ? i : -1).filter(i => i >= 0);
+
+        if (directIndices.length > 0 && transferIndices.length > 0) {
+            // En sondaki direct index, ilk transfer indexinden küçük olmalı (yani hep üstteler)
+            expect(Math.max(...directIndices)).toBeLessThan(Math.min(...transferIndices));
+        }
+    });
+
+    // Test 15: Aynı aktarma durumunda yürüyüş + durak penaltiesi düşük olan öne gelir
+    it('ayni kategori icinde dusuk maliyetli sonuc (cost) one gecer (Test 15)', async () => {
+        const results = await findRoutes('50314', '16484'); // Aktarmalı rota
+        expect(results.length).toBeGreaterThan(1);
+        const getCost = (r: any) => (r.walkingToBoardingMeters || 0) + (r.walkingFromAlightingMeters || 0) + ((r.totalStopCount || r.stopCount || 0) * 150);
+        const cost1 = getCost(results[0]);
+        const cost2 = getCost(results[1]);
+        expect(cost1).toBeLessThanOrEqual(cost2);
+    });
+
+    // Test 16: Farklı rota sonuçları aynı resultId değerini üretmez
+    it('farkli rota sonuclari ayni resultId degerini uretmez (Test 16)', async () => {
+        const results = await findRoutes('10019', '10324');
+        if (results.length > 1) {
+            expect(results[0].resultId).not.toBe(results[1].resultId);
+        }
+    });
+
+    // Test 17: Aktarmasız segment doğru biniş ve iniş duraklarıyla başlar ve biter
+    it('aktarmasiz segment dogru binis ve inis duraklariyla baslar ve biter (Test 17)', async () => {
+        const results = await findRoutes('10019', '10324');
+        const directRoute = results.find(r => r.type === 'direct') as DirectRouteResult;
+        expect(directRoute).toBeDefined();
+        expect(directRoute.segmentStopIds[0]).toBe(directRoute.actualBoardingStopId || directRoute.boardingStopId);
+        expect(directRoute.segmentStopIds[directRoute.segmentStopIds.length - 1]).toBe(directRoute.actualAlightingStopId || directRoute.alightingStopId);
+    });
+
+    // Test 18: Tek aktarmalı rota durak ilişkileri (ilk segment aktarmada biter, ikinci segment aktarmada başlar)
+    it('tek aktarmali rotalarda segment durak iliskileri (Test 18)', async () => {
+        const results = await findRoutes('50314', '16484'); // Aktarmalı rota
+        const transferRoute = results.find(r => r.type === 'transfer') as TransferRouteResult;
+        expect(transferRoute).toBeDefined();
+        // İlk segment aktarma durağında sona erer
+        expect(transferRoute.firstSegmentStopIds[transferRoute.firstSegmentStopIds.length - 1]).toBe(transferRoute.transferStopId);
+        // İkinci segment aktarma durağından başlar
+        expect(transferRoute.secondSegmentStopIds[0]).toBe(transferRoute.transferStopId);
     });
 
 });

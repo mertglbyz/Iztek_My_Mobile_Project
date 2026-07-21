@@ -1,10 +1,27 @@
+import patternTripShapeIndexRaw from '@/data/gtfs/pattern_trip_shape_index.json';
 import plannerStopsRaw from '@/data/gtfs/planner_stops.json';
 import routeShapesRaw from '@/data/gtfs/route_shapes.json';
 
 type Coordinate = [number, number]; // [lat, lon]
 
+interface PatternContext {
+    routeId: string;
+    directionId: string;
+    representativeTripId: string;
+    shapeId: string | null;
+}
+
 const routeShapes: Record<string, Record<string, Coordinate[]>> = routeShapesRaw as any;
 const plannerStops = plannerStopsRaw as any[];
+const patternTripShapeIndex: Record<string, PatternContext> = patternTripShapeIndexRaw as any;
+
+// shapeId → { routeId, directionId } ters-indeksi: shape'e ait route ve yönü bulmak için
+const shapeIdToRouteDirection: Record<string, { routeId: string; directionId: string }> = {};
+for (const [, ctx] of Object.entries(patternTripShapeIndex)) {
+    if (ctx.shapeId) {
+        shapeIdToRouteDirection[ctx.shapeId] = { routeId: ctx.routeId, directionId: ctx.directionId };
+    }
+}
 
 const deg2rad = (deg: number) => deg * (Math.PI / 180);
 
@@ -42,39 +59,80 @@ const findClosestPointIndex = (shape: Coordinate[], lat: number, lon: number): n
     return minIndex;
 };
 
+export interface GetShapeSegmentParams {
+    /** GTFS pattern_trip_shape_index'ten gelen shapeId */
+    shapeId: string | null;
+    /** Gerçek biniş durak ID'si */
+    boardingStopId: string;
+    /** Gerçek iniş durak ID'si */
+    alightingStopId: string;
+    /** Yön ID'si (0 veya 1) — shapeId bulunamazsa fallback için kullanılır */
+    directionId?: string;
+    /** Hat ID'si — shapeId bulunamazsa fallback için kullanılır */
+    routeId?: string;
+}
+
 /**
- * İki durak arasındaki koordinatları, yön ID'sini koruyarak ve sadece shape keserek döndürür.
- * @param routeId Araştırılacak hat numarası
- * @param directionId Hattın yönü (0 veya 1)
- * @param startStopId Başlangıç durak ID'si
- * @param endStopId Varış durak ID'si
- * @returns Kesilmiş [lat, lon] dizisi (haritada render için)
+ * Gerçek GTFS shape verisi üzerinden biniş ve iniş durakları arasındaki
+ * koordinat segmentini döndürür. shapeId öncelikli kullanılır;
+ * bulunamazsa routeId + directionId ile fallback yapılır.
+ *
+ * @returns [lat, lon] koordinat dizisi. Shape bulunamaz veya indeks hatası
+ *          oluşursa boş dizi döner — asla kuş uçuşu çizgi üretilmez.
  */
-export const getShapeSegment = (
-    routeId: string,
-    directionId: string,
-    startStopId: string,
-    endStopId: string
-): Coordinate[] => {
-    const shape = routeShapes[routeId]?.[directionId];
+export const getShapeSegment = ({
+    shapeId,
+    boardingStopId,
+    alightingStopId,
+    directionId,
+    routeId,
+}: GetShapeSegmentParams): Coordinate[] => {
+    // 1. shapeId üzerinden route + direction bul (öncelikli yol)
+    let resolvedRouteId: string | undefined = routeId;
+    let resolvedDirId: string | undefined = directionId;
+
+    if (shapeId) {
+        const mapped = shapeIdToRouteDirection[shapeId];
+        if (mapped) {
+            resolvedRouteId = mapped.routeId;
+            resolvedDirId = mapped.directionId;
+        } else {
+            console.warn(`[ShapeSegment] shapeId "${shapeId}" ters-indekste bulunamadı. Fallback: routeId=${routeId}, directionId=${directionId}`);
+        }
+    }
+
+    if (!resolvedRouteId || !resolvedDirId) {
+        console.warn('[ShapeSegment] routeId veya directionId belirlenemedi. Boş segment döndürülüyor.');
+        return [];
+    }
+
+    const shape = routeShapes[resolvedRouteId]?.[resolvedDirId];
     if (!shape || shape.length === 0) {
+        console.warn(`[ShapeSegment] Shape bulunamadı: routeId=${resolvedRouteId}, directionId=${resolvedDirId}`);
         return [];
     }
 
-    const startCoords = getStopCoordinates(startStopId);
-    const endCoords = getStopCoordinates(endStopId);
+    const boardingCoords = getStopCoordinates(boardingStopId);
+    const alightingCoords = getStopCoordinates(alightingStopId);
 
-    if (!startCoords || !endCoords) {
+    if (!boardingCoords || !alightingCoords) {
+        console.warn(`[ShapeSegment] Durak koordinatları bulunamadı: boarding=${boardingStopId}, alighting=${alightingStopId}`);
         return [];
     }
 
-    const startIdx = findClosestPointIndex(shape, startCoords[0], startCoords[1]);
-    const endIdx = findClosestPointIndex(shape, endCoords[0], endCoords[1]);
+    const startIdx = findClosestPointIndex(shape, boardingCoords[0], boardingCoords[1]);
+    const endIdx = findClosestPointIndex(shape, alightingCoords[0], alightingCoords[1]);
 
     if (startIdx <= endIdx) {
         return shape.slice(startIdx, endIdx + 1);
     } else {
-        console.warn(`[ShapeSegment] Olası yanlış shape veya yön seçimi! routeId:${routeId}, dir:${directionId}, startIdx:${startIdx}, endIdx:${endIdx}. Geçersiz segment.`);
+        // Biniş indeksi > iniş indeksi: yanlış shape veya yön seçimi ihtimali
+        console.warn(
+            `[ShapeSegment] Olası yanlış shape veya yön seçimi! ` +
+            `routeId:${resolvedRouteId}, dir:${resolvedDirId}, ` +
+            `boarding="${boardingStopId}" (idx:${startIdx}), alighting="${alightingStopId}" (idx:${endIdx}). ` +
+            `Geçersiz segment — boş dizi döndürülüyor.`
+        );
         return [];
     }
 };
