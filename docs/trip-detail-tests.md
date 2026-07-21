@@ -1,26 +1,17 @@
-# Faz 12 (Yolculuk Detay) Test Raporu
+# Yolculuk Detay Ekranı ve Sıralama Testleri
 
-Bu doküman, Faz 12 kapsamında geliştirilen *Yolculuk Detay Ekranı* (Trip Detail) ve *Sıralama / Shape Segmentasyon* özelliklerinin sağlamasını yapan Jest testlerinin açık senaryolarını içerir.
+## 1. Rota Sıralama Kuralları (Kategorik Sıralama)
+Algoritma sonuçları kullanıcıya gösterilmeden önce herhangi bir ağırlıklı maliyet (cost) formülü kullanılmaz. Aşağıdaki kesin kurallar sırasıyla, ayrı öncelikler halinde uygulanır:
 
-Tüm testler `tripPlanner.test.ts` ve `shapeSegmentService.test.ts` içerisinde çalıştırılmış, `%100 Success` (Başarı) alınmıştır.
+1. **Aktarmasız Rotalar Önce:** `type: 'direct'` olan rotalar her zaman `type: 'transfer'` rotalardan daha üst sırada yer alır.
+2. **Daha Az Yürüyüş Mesafesi:** Aynı aktarma kategorisindeki rotalar arasında, toplan yürüyüş mesafesi (`walkingToBoardingMeters` + `walkingFromAlightingMeters`) en düşük olan öne gelir.
+3. **Daha Az Durak Sayüsü:** Yürüyüş mesafesi tamamen eşit çıkarsa, durak sayısı (`totalStopCount`) daha az olan rota öne gelir.
+4. **Alfabetik Sıralama:** Eğer yürüyüş mesafesi ve durak sayısı tamamen eşitse, tam eşitlikte hat numarasına göre (`routeId`) alfabetik (artan) sıralama yapılır.
 
-## tripPlanner.ts (Routing ve Listeleme Testleri)
+## 2. Deterministik resultId
+Rota sonuçlarında kullanılan `resultId` rastgele (UUID vb.) üretilmez. "Aynı rota bileşenleriyle tekrar hesaplandığında aynı resultId değeri üretilir." Bu sayede React bileşenlerinde listenin gereksiz render edilmesi veya ID değişimlerinden kaynaklı çökmeler engellenir.
 
-1. **Deterministik ID Testi (Test 13 ve 16):**
-   - Aynı parametreler (biniş/iniş durakları, hat, yön) her seferinde saniyesine kadar *aynı* `resultId` üretti. Farklı otobüs kombinasyonları birbirinden tamamen izole farklı `resultId` üretti.
-
-2. **Cost Function Sıralama (Test 14 ve 15):**
-   - Aktarmasız rotaların, mutlak kuralla aktarmalı rotalardan önce geldiği doğrulandı.
-   - Aktarma sayıları eşit olduğunda: `Toplam Yürüyüş Metresi + (Durak Sayısı * 150)` bazlık Cost ceza fonksiyonu çalıştı. Daha düşük cezaya sahip kombinasyonların listenin (array) en başına tırmandığı kanıtlandı.
-
-3. **Segment Bağıntısı Kararlılığı (Test 17 ve 18):**
-   - Tek aktarmalı (Transfer) rotalarda; 1. otobüs segmentinin son durağının aktarma merkezi (Transfer Point) olduğu; 2. otobüs segmentinin ise bu aktarma merkezinden başladığı matematiksel offsetlerle test edildi.
-
-## shapeSegmentService.ts (Harita Geometrisi Testleri)
-
-4. **Gerçek Segment Kırpması:**
-   - Yüzlerce koordinat barındıran tam otobüs güzergahından, yalnızca Biniş Durağı ile İniş Durağı arasındaki parçanın (Sub-array) başarıyla çıkarıldığı tespit edildi (Boşluk/taşma oluşmadı).
-
-5. **Ters Yön / Kayıp Shape Toleransı:**
-   - Biniş indeksi, iniş indeksinden *büyükse* (Yâni otobüs o durağı geçmişse) fonksiyonun `undefined` bırakmayıp, Güvenli Boş Dizi (`[]`) döndüğü görüldü.
-   - Haritada GTFS kaynaklı bir kayıp durumunda, uygulamanın çökmediği garanti altına alındı.
+## 3. Yolculuk Detay Ekranı 
+Yolculuk detay ekranı test edilirken:
+- `resultId`, `startStopId`, ve `endStopId` kullanılarak rota state'den bağımsız olarak tekrar oluşturulabilir.
+- Herhangi bir yürüyüş adımı gerektiğinde, gerçek yaya güzergahı API'si devrede değilse fallback mekanizması olarak Haversine yaklaşık çizgisi oluşturulur.

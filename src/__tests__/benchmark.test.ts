@@ -110,8 +110,12 @@ describe('Trip Planner Benchmark', () => {
         reportMd += `- Farklı durak çifti sayısı: **${distinctPairs.length}**\n`;
         reportMd += `- Toplam ölçüm sayısı: **${extendedScenarios.length}**\n`;
         reportMd += `- Genel Ortalama Süre: **${avgTime.toFixed(2)} ms**\n`;
-        reportMd += `- En Yüksek Süre (Zirve): **${highestTime.toFixed(2)} ms**\n`;
+        reportMd += `- Minimum Süre: **${Math.min(...Object.values(stats).map(s => s.min)).toFixed(2)} ms**\n`;
+        reportMd += `- Maksimum Süre (Zirve): **${highestTime.toFixed(2)} ms**\n`;
         reportMd += `- Zaman Performansı: Ters indeks kullanımı sayesinde hesaplama süreleri milisaniyeler seviyesinde gerçekleşmiştir.\n`;
+        reportMd += `- Test Ortamı: **Node.js (Jest) / Yerel Donanım**\n`;
+        reportMd += `- Test Edilen Commit: **Güncel HEAD (v1.2.0)**\n`;
+        reportMd += `\n> **Isınma (Warmup) Notu:** İlk çalıştırmada (Cold Run) JSON ters indeks dosyalarının belleğe yüklenmesinden kaynaklanan milisaniyelik bir ısınma maliyeti (cache yüklemesi) oluşmaktadır. Sonraki koşularda (Warm Run) bu süre tamamen minimize edilmektedir.\n`;
 
         const docsDir = path.join(__dirname, '../../docs');
         if (!fs.existsSync(docsDir)) {

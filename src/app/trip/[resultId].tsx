@@ -184,8 +184,11 @@ export default function TripDetailScreen() {
 
         if (r.type === 'direct') {
             const dir = r as DirectRouteResult;
+            const boardStop = dir.actualBoardingStopId || dir.boardingStopId;
+            const isSameNameBoard = (dir.walkingToBoardingMeters && boardStop !== dir.boardingStopId && getStopNameById(dir.boardingStopId) === getStopNameById(boardStop));
+
             // 1. Başlangıç durağı (kullanıcının seçtiği)
-            steps.push({ id: 'start', type: 'origin', title: getStopNameById(dir.boardingStopId), stopId: dir.boardingStopId, icon: 'location' });
+            steps.push({ id: 'start', type: 'origin', title: isSameNameBoard ? `${getStopNameById(dir.boardingStopId)} – Seçilen durak` : getStopNameById(dir.boardingStopId), stopId: dir.boardingStopId, icon: 'location' });
 
             // 2. Gerekliyse gerçek biniş durağına yürüyüş
             if (dir.walkingToBoardingMeters) {
@@ -198,8 +201,11 @@ export default function TripDetailScreen() {
             }
 
             // 3. Otobüse biniş durağı
-            const boardStop = dir.actualBoardingStopId || dir.boardingStopId;
-            steps.push({ id: 'board', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${dir.routeId} numaralı hat`, stopId: boardStop, routeId: dir.routeId, routeDir: dir.directionId, icon: 'bus' });
+            let boardTitle = `${getStopNameById(boardStop)} durağından binin`;
+            if (isSameNameBoard) {
+                boardTitle = `${getStopNameById(boardStop)} – Durak ID: ${boardStop} (Yön: ${dir.directionId}) – Biniş yapılacak durak`;
+            }
+            steps.push({ id: 'board', type: 'board', title: boardTitle, subtitle: `${dir.routeId} numaralı hat`, stopId: boardStop, routeId: dir.routeId, routeDir: dir.directionId, icon: 'bus' });
 
             // 4. Aradaki duraklar
             if (dir.stopCount > 1) {
@@ -208,7 +214,13 @@ export default function TripDetailScreen() {
 
             // 5. İniş durağı
             const alightStop = dir.actualAlightingStopId || dir.alightingStopId;
-            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, stopId: alightStop, icon: 'exit' });
+            const isSameNameAlight = (dir.walkingFromAlightingMeters && alightStop !== dir.alightingStopId && getStopNameById(dir.alightingStopId) === getStopNameById(alightStop));
+
+            let alightTitle = `${getStopNameById(alightStop)} durağında inin`;
+            if (isSameNameAlight) {
+                alightTitle = `${getStopNameById(alightStop)} – Durak ID: ${alightStop} (Yön: ${dir.directionId}) – İniş yapılacak durak`;
+            }
+            steps.push({ id: 'alight', type: 'alight', title: alightTitle, stopId: alightStop, icon: 'exit' });
 
             // 6. Gerekliyse varış durağına yürüyüş
             if (dir.walkingFromAlightingMeters) {
@@ -221,17 +233,15 @@ export default function TripDetailScreen() {
             }
 
             // 7. Kullanıcının seçtiği varış durağı — HER ZAMAN son adım olarak eklenir
-            if (alightStop !== dir.alightingStopId) {
-                // İniş durağından farklıysa (yürüyüş gerektiren senaryo)
-                steps.push({ id: 'end', type: 'destination', title: getStopNameById(dir.alightingStopId), stopId: dir.alightingStopId, icon: 'flag' });
-            } else {
-                // İniş durağı zaten varış durağıysa sadece 'destination' ikonu ekle
-                steps.push({ id: 'end', type: 'destination', title: getStopNameById(dir.alightingStopId), stopId: dir.alightingStopId, icon: 'flag' });
-            }
+            const targetEndTitle = isSameNameAlight ? `${getStopNameById(dir.alightingStopId)} – Seçilen durak` : getStopNameById(dir.alightingStopId);
+            steps.push({ id: 'end', type: 'destination', title: targetEndTitle, stopId: dir.alightingStopId, icon: 'flag' });
         } else {
             const trans = r as TransferRouteResult;
+            const boardStop = trans.actualBoardingStopId || trans.boardingStopId;
+            const isSameNameBoardT = (trans.walkingToBoardingMeters && boardStop !== trans.boardingStopId && getStopNameById(trans.boardingStopId) === getStopNameById(boardStop));
+
             // 1. Başlangıç durağı
-            steps.push({ id: 'start', type: 'origin', title: getStopNameById(trans.boardingStopId), stopId: trans.boardingStopId, icon: 'location' });
+            steps.push({ id: 'start', type: 'origin', title: isSameNameBoardT ? `${getStopNameById(trans.boardingStopId)} – Seçilen durak` : getStopNameById(trans.boardingStopId), stopId: trans.boardingStopId, icon: 'location' });
 
             // 2. Gerekliyse ilk durağa yürüyüş
             if (trans.walkingToBoardingMeters) {
@@ -244,8 +254,11 @@ export default function TripDetailScreen() {
             }
 
             // 3. Birinci hatta biniş
-            const boardStop = trans.actualBoardingStopId || trans.boardingStopId;
-            steps.push({ id: 'board1', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${trans.firstRouteId} numaralı hat`, stopId: boardStop, routeId: trans.firstRouteId, routeDir: trans.firstDirectionId, icon: 'bus' });
+            let board1Title = `${getStopNameById(boardStop)} durağından binin`;
+            if (isSameNameBoardT) {
+                board1Title = `${getStopNameById(boardStop)} – Durak ID: ${boardStop} (Yön: ${trans.firstDirectionId}) – Biniş yapılacak durak`;
+            }
+            steps.push({ id: 'board1', type: 'board', title: board1Title, subtitle: `${trans.firstRouteId} numaralı hat`, stopId: boardStop, routeId: trans.firstRouteId, routeDir: trans.firstDirectionId, icon: 'bus' });
 
             // 4. İlk hat üzerindeki duraklar
             if (trans.firstSegmentStopCount > 1) {
@@ -265,7 +278,13 @@ export default function TripDetailScreen() {
 
             // 8. İniş durağı
             const alightStop = trans.actualAlightingStopId || trans.alightingStopId;
-            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, stopId: alightStop, icon: 'exit' });
+            const isSameNameAlightT = (trans.walkingFromAlightingMeters && alightStop !== trans.alightingStopId && getStopNameById(trans.alightingStopId) === getStopNameById(alightStop));
+
+            let alightTitle = `${getStopNameById(alightStop)} durağında inin`;
+            if (isSameNameAlightT) {
+                alightTitle = `${getStopNameById(alightStop)} – Durak ID: ${alightStop} (Yön: ${trans.secondDirectionId}) – İniş yapılacak durak`;
+            }
+            steps.push({ id: 'alight', type: 'alight', title: alightTitle, stopId: alightStop, icon: 'exit' });
 
             // 9. Gerekliyse varış durağına yürüyüş
             if (trans.walkingFromAlightingMeters) {
@@ -278,7 +297,8 @@ export default function TripDetailScreen() {
             }
 
             // 10. Kullanıcının seçtiği varış durağı — HER ZAMAN son adım
-            steps.push({ id: 'end', type: 'destination', title: getStopNameById(trans.alightingStopId), stopId: trans.alightingStopId, icon: 'flag' });
+            const targetEndTitleT = isSameNameAlightT ? `${getStopNameById(trans.alightingStopId)} – Seçilen durak` : getStopNameById(trans.alightingStopId);
+            steps.push({ id: 'end', type: 'destination', title: targetEndTitleT, stopId: trans.alightingStopId, icon: 'flag' });
         }
 
         return steps;
@@ -377,7 +397,7 @@ export default function TripDetailScreen() {
             </View>
 
             {/* 2) Draggable Bottom Sheet */}
-            <Animated.View style={[styles.bottomSheetContainer, { transform: [{ translateY: sheetY }] }]}>
+            <Animated.View style={[styles.bottomSheetContainer, { top: sheetY }]}>
 
                 {/* Header containing PanResponder */}
                 <View {...panResponder.panHandlers} style={styles.sheetHeaderWrapper}>
@@ -405,13 +425,15 @@ export default function TripDetailScreen() {
                     </View>
                 </View>
 
-                {/* Content (Timline FlatList) */}
+                {/* Content (Timeline FlatList) */}
                 <FlatList
+                    style={{ flex: 1 }}
                     data={steps}
                     keyExtractor={(item) => (item as any).id}
                     renderItem={renderStep}
                     contentContainerStyle={styles.timelineList}
-                    bounces={false}
+                    bounces={true}
+                    showsVerticalScrollIndicator={false}
                 />
             </Animated.View>
         </View>
@@ -427,7 +449,7 @@ const styles = StyleSheet.create({
     mapBackgroundContainer: { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' },
     mapPlaceholder: { flex: 1, backgroundColor: Colors.gray300, justifyContent: 'center', alignItems: 'center' },
     bottomSheetContainer: {
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: -SCREEN_HEIGHT, // Extra bottom padding for translating
+        position: 'absolute', left: 0, right: 0, bottom: 0,
         backgroundColor: Colors.background,
         borderTopLeftRadius: 20, borderTopRightRadius: 20,
         shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 10
@@ -443,7 +465,7 @@ const styles = StyleSheet.create({
     backBtn: { marginRight: Spacing.md },
     headerTitle: { fontSize: FontSizes.lg, fontWeight: FontWeights.bold, color: Colors.textPrimary },
     headerSubtitle: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2 },
-    timelineList: { paddingBottom: Spacing.xxl + 200, paddingTop: Spacing.md },
+    timelineList: { paddingBottom: Spacing.xl, paddingTop: Spacing.md },
     stepContainer: { flexDirection: 'row', minHeight: 60, paddingHorizontal: Spacing.lg },
     stepLeft: { width: 40, alignItems: 'center' },
     stepIconContainer: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primarySoft, justifyContent: 'center', alignItems: 'center', zIndex: 2 },

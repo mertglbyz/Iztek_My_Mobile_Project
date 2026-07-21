@@ -1,4 +1,0 @@
-> npx tsc --noEmit
-
-[No output, zero errors. Typescript compilation successful.]
-Exit Code: 0

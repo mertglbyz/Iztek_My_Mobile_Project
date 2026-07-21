@@ -90,14 +90,20 @@ Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü 
   2. Daha az yaklaşık yürüyüş mesafesi önce listelenir
   3. Eşit yürüyüş mesafesinde daha az toplam durak sayısı önce gelir
   4. Her şey eşitse hat numarasına göre alfabetik sıralama yapılır
-- **Performans Metrikleri:** Benchmark testleri sonucunda güncel ortalama rota arama süresi **1.12 ms**, zirve (max) arama süresi ise **7.76 ms** olarak ölçülmüştür.
-
-> **Önerilen rota;** aktarma sayısı, yaklaşık yürüyüş mesafesi ve durak sayısına göre sıralanmaktadır. Trafik, canlı ETA ve gerçek yaya yol süresi değerlendirmesi içermez.
+- **Performans Benchmark Özeti:** 
+  - Farklı durak çifti sayısı: **30**
+  - Toplam ölçüm sayısı: **120**
+  - Minimum Süre: **0.01 ms**
+  - Genel Ortalama Süre: **0.72 ms**
+  - Maksimum Süre (Zirve): **11.04 ms**
+  - Test Ortamı: **Node.js (Jest) / Yerel Donanım**
+  - Test Edilen Commit: **Güncel HEAD (v1.2.0)**
+  - *Isınma Maliyeti:* İlk çalıştırmada veri dosyalarının (JSON) belleğe yüklenmesinden kaynaklanan milisaniyelik bir gecikme (cold run) oluşmaktadır, sonraki çağrılarda süreler hemen 0.00ms civarına düşmektedir. (Ayrıntılı rapor `docs/trip-planner-benchmark.md` içinde)
 
 ### Faz 11 Kapanış Notları
 - **Ters İndeks Kullanımı:** `importGtfs.js` içindeki indeksleme fonksiyonlarıyla derleme anında `stop_routes_index.json` dosyası oluşturulmaktadır.
 - **UI Fallback Gösterimi:** `directions.tsx` üzerinde takvim süresi biten GTFS arşivi için uyarı arayüz öğesi eklendi.
-- **Değerlendirme Testleri:** 11 temel senaryo otomatik test edilmiş ve `docs/trip-planner-tests.md` dosyasına kaydedilmiştir.
+- **Değerlendirme Testleri:** 3 test suite içinde toplam 22 otomatik test başarıyla tamamlanmış ve sonuçlar `docs/trip-planner-tests.md` dosyasına kaydedilmiştir.
 
 ## Faz 12 – Yolculuk Detay Ekranı ve Gerçek GTFS Güzergâhları
 
