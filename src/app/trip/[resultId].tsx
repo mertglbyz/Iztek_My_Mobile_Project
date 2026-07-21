@@ -38,61 +38,61 @@ export default function TripDetailScreen() {
 
         if (r.type === 'direct') {
             const dir = r as DirectRouteResult;
-            steps.push({ id: 'start', type: 'origin', title: getStopNameById(dir.boardingStopId), icon: 'location' });
+            steps.push({ id: 'start', type: 'origin', title: getStopNameById(dir.boardingStopId), stopId: dir.boardingStopId, icon: 'location' });
 
             if (dir.walkingToBoardingMeters) {
                 steps.push({ id: 'walk1', type: 'walk', title: `Yaklaşık ${dir.walkingToBoardingMeters}m yürüyün`, icon: 'walk' });
             }
 
             const boardStop = dir.actualBoardingStopId || dir.boardingStopId;
-            steps.push({ id: 'board', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${dir.routeId} numaralı hat`, icon: 'bus' });
+            steps.push({ id: 'board', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${dir.routeId} numaralı hat`, stopId: boardStop, routeId: dir.routeId, routeDir: dir.directionId, icon: 'bus' });
 
             if (dir.stopCount > 1) {
-                steps.push({ id: 'ride', type: 'ride', title: `${dir.stopCount - 1} durak (Otobüs yolculuğu)`, icon: 'git-commit' });
+                steps.push({ id: 'ride', type: 'ride', title: `${dir.stopCount - 1} durak (Otobüs yolculuğu)`, routeId: dir.routeId, routeDir: dir.directionId, icon: 'git-commit' });
             }
 
             const alightStop = dir.actualAlightingStopId || dir.alightingStopId;
-            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, icon: 'exit' });
+            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, stopId: alightStop, icon: 'exit' });
 
             if (dir.walkingFromAlightingMeters) {
                 steps.push({ id: 'walk2', type: 'walk', title: `Yaklaşık ${dir.walkingFromAlightingMeters}m yürüyün`, icon: 'walk' });
             }
 
             if (dir.actualAlightingStopId && dir.actualAlightingStopId !== dir.alightingStopId) {
-                steps.push({ id: 'end', type: 'destination', title: getStopNameById(dir.alightingStopId), icon: 'flag' });
+                steps.push({ id: 'end', type: 'destination', title: getStopNameById(dir.alightingStopId), stopId: dir.alightingStopId, icon: 'flag' });
             }
         } else {
             const trans = r as TransferRouteResult;
-            steps.push({ id: 'start', type: 'origin', title: getStopNameById(trans.boardingStopId), icon: 'location' });
+            steps.push({ id: 'start', type: 'origin', title: getStopNameById(trans.boardingStopId), stopId: trans.boardingStopId, icon: 'location' });
 
             if (trans.walkingToBoardingMeters) {
                 steps.push({ id: 'walk1', type: 'walk', title: `Yaklaşık ${trans.walkingToBoardingMeters}m yürüyün`, icon: 'walk' });
             }
 
             const boardStop = trans.actualBoardingStopId || trans.boardingStopId;
-            steps.push({ id: 'board1', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${trans.firstRouteId} numaralı hat`, icon: 'bus' });
+            steps.push({ id: 'board1', type: 'board', title: `${getStopNameById(boardStop)} durağından binin`, subtitle: `${trans.firstRouteId} numaralı hat`, stopId: boardStop, routeId: trans.firstRouteId, routeDir: trans.firstDirectionId, icon: 'bus' });
 
             if (trans.firstSegmentStopCount > 1) {
-                steps.push({ id: 'ride1', type: 'ride', title: `${trans.firstSegmentStopCount - 1} durak (Otobüs yolculuğu)`, icon: 'git-commit' });
+                steps.push({ id: 'ride1', type: 'ride', title: `${trans.firstSegmentStopCount - 1} durak (Otobüs yolculuğu)`, routeId: trans.firstRouteId, routeDir: trans.firstDirectionId, icon: 'git-commit' });
             }
 
-            steps.push({ id: 'transfer', type: 'transfer', title: `${getStopNameById(trans.transferStopId)} durağında inin ve aktarma yapın`, icon: 'swap-horizontal' });
+            steps.push({ id: 'transfer', type: 'transfer', title: `${getStopNameById(trans.transferStopId)} durağında inin ve aktarma yapın`, stopId: trans.transferStopId, icon: 'swap-horizontal' });
 
-            steps.push({ id: 'board2', type: 'board', title: `${getStopNameById(trans.transferStopId)} durağından binin`, subtitle: `${trans.secondRouteId} numaralı hat`, icon: 'bus' });
+            steps.push({ id: 'board2', type: 'board', title: `${getStopNameById(trans.transferStopId)} durağından binin`, subtitle: `${trans.secondRouteId} numaralı hat`, stopId: trans.transferStopId, routeId: trans.secondRouteId, routeDir: trans.secondDirectionId, icon: 'bus' });
 
             if (trans.secondSegmentStopCount > 1) {
-                steps.push({ id: 'ride2', type: 'ride', title: `${trans.secondSegmentStopCount - 1} durak (Otobüs yolculuğu)`, icon: 'git-commit' });
+                steps.push({ id: 'ride2', type: 'ride', title: `${trans.secondSegmentStopCount - 1} durak (Otobüs yolculuğu)`, routeId: trans.secondRouteId, routeDir: trans.secondDirectionId, icon: 'git-commit' });
             }
 
             const alightStop = trans.actualAlightingStopId || trans.alightingStopId;
-            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, icon: 'exit' });
+            steps.push({ id: 'alight', type: 'alight', title: `${getStopNameById(alightStop)} durağında inin`, stopId: alightStop, icon: 'exit' });
 
             if (trans.walkingFromAlightingMeters) {
                 steps.push({ id: 'walk2', type: 'walk', title: `Yaklaşık ${trans.walkingFromAlightingMeters}m yürüyün`, icon: 'walk' });
             }
 
             if (trans.actualAlightingStopId && trans.actualAlightingStopId !== trans.alightingStopId) {
-                steps.push({ id: 'end', type: 'destination', title: getStopNameById(trans.alightingStopId), icon: 'flag' });
+                steps.push({ id: 'end', type: 'destination', title: getStopNameById(trans.alightingStopId), stopId: trans.alightingStopId, icon: 'flag' });
             }
         }
 
@@ -124,8 +124,23 @@ export default function TripDetailScreen() {
     const renderStep = ({ item, index }: { item: any, index: number }) => {
         const isLast = index === steps.length - 1;
 
+        const handlePress = () => {
+            if (item.stopId) {
+                router.push(`/stop/${item.stopId}`);
+            } else if (item.routeId) {
+                router.push(`/route/${item.routeId}?directionId=${item.routeDir || '0'}`);
+            }
+        };
+
+        const isTouchable = !!item.stopId || !!item.routeId;
+
         return (
-            <View style={styles.stepContainer}>
+            <TouchableOpacity
+                style={styles.stepContainer}
+                onPress={handlePress}
+                disabled={!isTouchable}
+                activeOpacity={0.7}
+            >
                 <View style={styles.stepLeft}>
                     <View style={[styles.stepIconContainer, item.type === 'walk' && { backgroundColor: Colors.gray300 }]}>
                         <Ionicons name={item.icon} size={18} color={item.type === 'walk' ? Colors.textSecondary : Colors.primary} />
@@ -133,10 +148,10 @@ export default function TripDetailScreen() {
                     {!isLast && <View style={[styles.stepLine, item.type === 'walk' && { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.textDisabled, backgroundColor: 'transparent' }]} />}
                 </View>
                 <View style={styles.stepRight}>
-                    <Text style={styles.stepTitle}>{item.title}</Text>
+                    <Text style={[styles.stepTitle, isTouchable && styles.touchableText]}>{item.title}</Text>
                     {item.subtitle && <Text style={styles.stepSubtitle}>{item.subtitle}</Text>}
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -187,7 +202,8 @@ const styles = StyleSheet.create({
     stepLeft: { width: 40, alignItems: 'center' },
     stepIconContainer: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primarySoft, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
     stepLine: { width: 2, flex: 1, backgroundColor: Colors.primary, marginTop: -4, marginBottom: -4, zIndex: 1 },
-    stepRight: { flex: 1, paddingLeft: Spacing.md, paddingBottom: Spacing.lg },
+    stepRight: { flex: 1, paddingLeft: Spacing.md, paddingBottom: Spacing.lg, justifyContent: 'center' },
     stepTitle: { fontSize: FontSizes.md, fontWeight: FontWeights.semibold, color: Colors.textPrimary },
+    touchableText: { textDecorationLine: 'underline' },
     stepSubtitle: { fontSize: FontSizes.sm, color: Colors.primary, marginTop: 4, fontWeight: FontWeights.medium }
 });
