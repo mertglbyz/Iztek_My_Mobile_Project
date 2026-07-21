@@ -94,16 +94,16 @@ Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü 
   - Farklı durak çifti sayısı: **30**
   - Toplam ölçüm sayısı: **120**
   - Minimum Süre: **0.01 ms**
-  - Genel Ortalama Süre: **0.72 ms**
-  - Maksimum Süre (Zirve): **11.04 ms**
+  - Genel Ortalama Süre: **0.58 ms**
+  - Maksimum Süre (Zirve): **10.86 ms**
   - Test Ortamı: **Node.js (Jest) / Yerel Donanım**
-  - Test Edilen Commit: **Güncel HEAD (v1.2.0)**
+  - Test Edilen Commit: **88bc826**
   - *Isınma Maliyeti:* İlk çalıştırmada veri dosyalarının (JSON) belleğe yüklenmesinden kaynaklanan milisaniyelik bir gecikme (cold run) oluşmaktadır, sonraki çağrılarda süreler hemen 0.00ms civarına düşmektedir. (Ayrıntılı rapor `docs/trip-planner-benchmark.md` içinde)
 
 ### Faz 11 Kapanış Notları
 - **Ters İndeks Kullanımı:** `importGtfs.js` içindeki indeksleme fonksiyonlarıyla derleme anında `stop_routes_index.json` dosyası oluşturulmaktadır.
 - **UI Fallback Gösterimi:** `directions.tsx` üzerinde takvim süresi biten GTFS arşivi için uyarı arayüz öğesi eklendi.
-- **Değerlendirme Testleri:** 3 test suite içinde toplam 22 otomatik test başarıyla tamamlanmış ve sonuçlar `docs/trip-planner-tests.md` dosyasına kaydedilmiştir.
+- **Değerlendirme Testleri:** 5 test suite içinde toplam 31 otomatik test başarıyla tamamlanmış ve sonuçlar `docs/trip-planner-tests.md` dosyasına kaydedilmiştir.
 
 ## Faz 12 – Yolculuk Detay Ekranı ve Gerçek GTFS Güzergâhları
 

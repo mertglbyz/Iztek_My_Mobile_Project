@@ -126,6 +126,8 @@ export default function DirectionsScreen() {
         return stop ? stop.name : `Durak ${id}`;
     };
 
+    const getStopNameWithId = (id: string) => `${getStopNameById(id)} (Durak ID: ${id})`;
+
     const renderTripCard = ({ item: trip, index: idx }: { item: TripPlanResult, index: number }) => {
         if (trip.type === 'direct') {
             const direct = trip as DirectRouteResult;
@@ -152,7 +154,7 @@ export default function DirectionsScreen() {
                     </TouchableOpacity>
                     {direct.walkingToBoardingMeters ? (
                         <Text style={[styles.tripSummary, { color: Colors.primary }]}>
-                            🚶 {getStopNameById(direct.actualBoardingStopId!)} durağına {direct.walkingToBoardingMeters}m yürü
+                            🚶 Biniş yapılacak durak: {getStopNameWithId(direct.actualBoardingStopId!)} - {direct.walkingToBoardingMeters}m yürü
                         </Text>
                     ) : (
                         <Text style={styles.tripSummary}>
@@ -162,7 +164,7 @@ export default function DirectionsScreen() {
                     {direct.walkingFromAlightingMeters ? (
                         <>
                             <Text style={styles.tripSummary}>
-                                {getStopNameById(direct.actualAlightingStopId!)} durağında in
+                                İniş yapılacak durak: {getStopNameWithId(direct.actualAlightingStopId!)}
                             </Text>
                             <Text style={[styles.tripSummary, { color: Colors.primary }]}>
                                 🚶 {getStopNameById(direct.alightingStopId)} noktasına {direct.walkingFromAlightingMeters}m yürü
@@ -201,7 +203,7 @@ export default function DirectionsScreen() {
                     </TouchableOpacity>
                     {transfer.walkingToBoardingMeters ? (
                         <Text style={[styles.tripSummary, { color: Colors.primary }]}>
-                            🚶 {getStopNameById(transfer.actualBoardingStopId!)} durağına {transfer.walkingToBoardingMeters}m yürü
+                            🚶 Biniş yapılacak durak: {getStopNameWithId(transfer.actualBoardingStopId!)} - {transfer.walkingToBoardingMeters}m yürü
                         </Text>
                     ) : (
                         <Text style={styles.tripSummary}>
@@ -224,7 +226,7 @@ export default function DirectionsScreen() {
                     {transfer.walkingFromAlightingMeters ? (
                         <>
                             <Text style={styles.tripSummary}>
-                                {getStopNameById(transfer.actualAlightingStopId!)} durağında in
+                                İniş yapılacak durak: {getStopNameWithId(transfer.actualAlightingStopId!)}
                             </Text>
                             <Text style={[styles.tripSummary, { color: Colors.primary }]}>
                                 🚶 {getStopNameById(transfer.alightingStopId)} noktasına {transfer.walkingFromAlightingMeters}m yürü

@@ -1,4 +1,5 @@
 import { findRoutes } from '@/services/tripPlanner';
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -87,6 +88,10 @@ describe('Trip Planner Benchmark', () => {
         }
 
         const avgTime = totalTime / extendedScenarios.length;
+        const testedCommit = execSync('git -c safe.directory=C:/İztek_First_Project rev-parse --short HEAD', {
+            cwd: path.join(__dirname, '../..'),
+            encoding: 'utf8'
+        }).trim();
 
         reportMd += `### Tüm Koşular\n\n`;
         reportMd += `| Senaryo | Kategori | Rota Sayısı | Hesaplama Süresi (ms) |\n`;
@@ -114,7 +119,7 @@ describe('Trip Planner Benchmark', () => {
         reportMd += `- Maksimum Süre (Zirve): **${highestTime.toFixed(2)} ms**\n`;
         reportMd += `- Zaman Performansı: Ters indeks kullanımı sayesinde hesaplama süreleri milisaniyeler seviyesinde gerçekleşmiştir.\n`;
         reportMd += `- Test Ortamı: **Node.js (Jest) / Yerel Donanım**\n`;
-        reportMd += `- Test Edilen Commit: **Güncel HEAD (v1.2.0)**\n`;
+        reportMd += `- Test Edilen Commit: **${testedCommit}**\n`;
         reportMd += `\n> **Isınma (Warmup) Notu:** İlk çalıştırmada (Cold Run) JSON ters indeks dosyalarının belleğe yüklenmesinden kaynaklanan milisaniyelik bir ısınma maliyeti (cache yüklemesi) oluşmaktadır. Sonraki koşularda (Warm Run) bu süre tamamen minimize edilmektedir.\n`;
 
         const docsDir = path.join(__dirname, '../../docs');

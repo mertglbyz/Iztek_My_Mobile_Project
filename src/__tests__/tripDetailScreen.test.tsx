@@ -21,6 +21,30 @@ jest.mock('@/services/tripPlanner', () => ({
     findRoutes: jest.fn()
 }));
 
+// Mock react-native
+jest.mock('react-native', () => ({
+    ActivityIndicator: 'ActivityIndicator',
+    Animated: {
+        View: 'Animated.View',
+        Value: jest.fn(() => ({
+            interpolate: jest.fn()
+        })),
+        spring: jest.fn(() => ({ start: jest.fn() })),
+        event: jest.fn()
+    },
+    Dimensions: { get: () => ({ height: 1000, width: 500 }) },
+    FlatList: 'FlatList',
+    PanResponder: {
+        create: jest.fn(() => ({
+            panHandlers: {}
+        }))
+    },
+    StyleSheet: { create: (s: any) => s },
+    Text: 'Text',
+    TouchableOpacity: 'TouchableOpacity',
+    View: 'View'
+}));
+
 // Mock Native Modules (to prevent crashes on other imports)
 jest.mock('react-native-maps', () => {
     const React = require('react');

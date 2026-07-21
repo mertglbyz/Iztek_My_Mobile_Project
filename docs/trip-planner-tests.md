@@ -1,6 +1,6 @@
 # Trip Planner ve Faz 12 Otomatik Test Raporları
 
-Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir. Tüm hata tolerans, performans ve algoritma testleri **3 ana suite içinde toplam 22 otomatik test başarıyla tamamlanmış** ve sonuçlar aşağıda gruplanmıştır.
+Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir. Tüm hata tolerans, performans ve algoritma testleri **5 ana suite içinde toplam 31 otomatik test başarıyla tamamlanmış** ve sonuçlar aşağıda gruplanmıştır.
 
 ## 1. Trip Planner algoritma testleri
 - **Test Edilen Davranış:** Aynı durak seçimi, uzak duraklar arası aktarma, 150m sınırı altı/üstü durakların yürüyüşe eklenmesi, ters yönlerin filtrelenmesi ve duplikasyon rotaların birleştirilmesi.
@@ -41,18 +41,18 @@ Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir.
 - **Test Edilen Davranış:** Ağır GTFS test dosyalarının RAM üzerinden bellek yükü (Node.js performansı) hesaplanması. Isınma süresinin ölçülmesi.
 - **Kullanılan Veri veya Fixture:** Algoritmadan seçilen 30 rastgele durak kombinasyonu (Toplam 120 test tekrarı).
 - **Beklenen Sonuç:** RAM belleklemesi (Isınma/Cold Run) sonrası rota hesaplama süresinin 5ms standardının altında (ideal koşulda 1ms) kalması.
-- **Gerçek Sonuç:** Ortalama süre 0.72 ms, maksimum süre ise zirve koşulda 11.04 ms'de kalarak başarı göstermiştir.
+- **Gerçek Sonuç:** Ortalama süre 0.58 ms, maksimum süre ise zirve koşulda 10.86 ms'de kalarak başarı göstermiştir.
 - **Başarılı veya Başarısız Durumu:** Başarılı
 
 ## 7. Yolculuk detay ekranı ve parametre testleri
 - **Test Edilen Davranış:** Eksik `resultId` parametresi veya rotası bulunmayan/çökmeye açık uç durumlarda arayüzün (UI) kontrollü uyarı fırlatması ve Geri Dön butonunun denenmesi.
 - **Kullanılan Veri veya Fixture:** URL test hook mockup ve eksik JSON dataları.
 - **Beklenen Sonuç:** Bileşenlerin hata atmak yerine uyarı vererek fallback arayüzüne geçmesi. Geçerli rotanın bulunamaması senaryosunda sessiz çöküşün önlenmesi.
-- **Gerçek Sonuç:** Henüz tüm UI test senaryoları eklenmemiştir (Eksik Test Tespiti).
-- **Başarılı veya Başarısız Durumu:** Beklemede (Eksik Test - Düzeltilecek)
+- **Gerçek Sonuç:** Eksik `resultId`, eksik başlangıç/varış durağı, rota bulunamaması ve shape bulunamaması senaryolarında detay ekranı kontrollü uyarı veya geri dönüş seçeneği göstermektedir.
+- **Başarılı veya Başarısız Durumu:** Başarılı
 
 ## 8. Yürüyüş servisi testleri
-- **Test Edilen Davranış:** Yaklaşık yürüyüş güzergahı API'sinin, haversine bağlantı kullanıp sahte rotalar üretmeden `source = approximate` kaynağını düzgün işlemesi.
+- **Test Edilen Davranış:** Yaklaşık yürüyüş güzergahı API'sinin, haversine bağlantı kullanıp sahte rotalar üretmeden `source = approximate-haversine` kaynağını düzgün işlemesi.
 - **Kullanılan Veri veya Fixture:** `38.4237, 27.1428` -> `38.4111, 27.1352` kuş uçuşu koordinat isteği.
 - **Beklenen Sonuç:** `distanceMeters`, `durationSeconds` ve `source` metriklerinin mock yerine gerçek hesaplama dönmesi, aynı koordinatlarda 0 (sıfır) dönmesi.
 - **Gerçek Sonuç:** Servis 1500m altı ve 0 durumlarına doğru değer atmaktadır, fallback yapısı UI senaryoları öncesinde hazırdır.

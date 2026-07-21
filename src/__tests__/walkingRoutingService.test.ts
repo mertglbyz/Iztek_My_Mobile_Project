@@ -2,7 +2,7 @@ import { getWalkingRoute } from '@/services/walkingRoutingService';
 
 describe('Walking Routing Service Tests', () => {
 
-    it('getWalkingRoute basarili bir sekilde kordinatlar arasi yaklasik rotayi (approximate) hesaplar', async () => {
+    it('getWalkingRoute basarili bir sekilde kordinatlar arasi yaklasik rotayi (approximate-haversine) hesaplar', async () => {
         const fromCoord = { latitude: 38.4237, longitude: 27.1428 };
         const toCoord = { latitude: 38.4111, longitude: 27.1352 };
 
@@ -16,8 +16,8 @@ describe('Walking Routing Service Tests', () => {
         expect(result.distanceMeters).toBeGreaterThan(0);
         expect(result.distanceMeters).toBeLessThan(2000); // Ortalama bu iki nokta arası 1.5km civarıdır
 
-        // Kuş uçuşu (approximate) kaynak kullanılıyor
-        expect(result.source).toBe('approximate');
+        // Kuş uçuşu (approximate-haversine) kaynak kullanılıyor
+        expect(result.source).toBe('approximate-haversine');
 
         // Geometri noktaları barındırmalı
         expect(result.geometry).toBeDefined();

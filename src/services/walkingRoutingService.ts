@@ -13,7 +13,7 @@ export interface WalkingRouteSegment {
         latitude: number;
         longitude: number;
     }[];
-    source: 'backend-osm' | 'approximate';
+    source: 'backend-osm' | 'approximate-haversine';
 }
 
 interface Coordinate {
@@ -36,7 +36,7 @@ const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 /**
  * İki koordinat arasındaki yaya rotasını döndürür.
- * Geçici olarak kuş uçuşu (approximate) kaynaklı iki noktalı geometri üretir.
+ * Geçici olarak kuş uçuşu (approximate-haversine) kaynaklı iki noktalı geometri üretir.
  * 
  * @param fromCoordinate Başlangıç koordinatı
  * @param toCoordinate Varış koordinatı
@@ -64,7 +64,7 @@ export const getWalkingRoute = async (
         toStopId,
         distanceMeters,
         durationSeconds,
-        source: 'approximate',
+        source: 'approximate-haversine',
         geometry: [
             { latitude: fromCoordinate.latitude, longitude: fromCoordinate.longitude },
             { latitude: toCoordinate.latitude, longitude: toCoordinate.longitude }
