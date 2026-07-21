@@ -1,40 +1,60 @@
-﻿PASS src/__tests__/tripPlanner.test.ts
-  Trip Planner Algorithm Tests
-    √ aynı durak secilirse bos doner (Test 1)
-    √ dogru yonde aktarmasiz rota bulur (Test 2)
-    √ dogru yonde calisirken yanlis yonu dahil etmez (Test 3)
-    √ uzak duraklar arasi en az bir tek aktarmali rota bulur (Test 4)
-    √ varis sirasi baslangictan onceyse o yonu süzgece takilir (Test 5)
-    √ duplikasyon rotalar teke indirgenir (Test 6)
-    √ sonuclari maksimium 10 kayit ile limitler (Test 7)
-    √ 150m icerisindeki yakin duraklari adaya ekler (Test 8)
-    √ 150m siniri uzerindeki uzak duraklar adaya alinmaz (Test 9)
-    √ tutarli veri iceren gercek durak ciftinde aktarmasiz rota uretir (Test 10)
-    √ ters yon aramasinda baslangic civarinda yuruyus gerektiren bir rota bulur (Test 11)
 
+> durak-yakinimda@1.0.0 test
+> jest --no-color
+
+PASS src/__tests__/benchmark.test.ts
+PASS src/__tests__/tripPlanner.test.ts
   ● Console
 
     console.log
-      === FAZ 11: AŞAMA 4 TERS YÖN BAŞLANGIÇ YÜRÜYÜŞ KANITI ===
+      === FAZ 11: AŞAMA 4 TERS YÖN BAŞLANGIÇ YÜRÜYÜŞ RAPORU ===
 
-      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:139:21)
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:142:17)
 
     console.log
       Original Boarding: 41172, Actual Boarding Stop: 41177
 
-      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:140:21)
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:143:17)
 
     console.log
       Walking Distance: 119 meters
 
-      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:141:21)
+      at Object.<anonymous> (src/__tests__/tripPlanner.test.ts:144:17)
 
-PASS src/__tests__/benchmark.test.ts
-  Trip Planner Benchmark
-    √ creates benchmark report for 10 pairs with 4 iterations
+PASS src/__tests__/shapeSegmentService.test.ts
+  ● Console
 
-Test Suites: 2 passed, 2 total
-Tests:       12 passed, 12 total
+    console.warn
+      [ShapeSegment] Olası yanlış shape veya yön seçimi! routeId:TEST_ROUTE, dir:1, boarding="stopB" (idx:2), alighting="stopA" (idx:0). Geçersiz segment — boş dizi döndürülüyor.
+
+      128 |     } else {
+      129 |         // Biniş indeksi > iniş indeksi: yanlış shape veya yön seçimi ihtimali
+    > 130 |         console.warn(
+          |                 ^
+      131 |             `[ShapeSegment] Olası yanlış shape veya yön seçimi! ` +
+      132 |             `routeId:${resolvedRouteId}, dir:${resolvedDirId}, ` +
+      133 |             `boarding="${boardingStopId}" (idx:${startIdx}), alighting="${alightingStopId}" (idx:${endIdx}). ` +
+
+      at getShapeSegment (src/services/shapeSegmentService.ts:130:17)
+      at Object.<anonymous> (src/__tests__/shapeSegmentService.test.ts:43:40)
+
+    console.warn
+      [ShapeSegment] Shape bulunamadı: routeId=WRONG_ROUTE, directionId=1
+
+      109 |     const shape = routeShapes[resolvedRouteId]?.[resolvedDirId];
+      110 |     if (!shape || shape.length === 0) {
+    > 111 |         console.warn(`[ShapeSegment] Shape bulunamadı: routeId=${resolvedRouteId}, directionId=${resolvedDirId}`);
+          |                 ^
+      112 |         return [];
+      113 |     }
+      114 |
+
+      at getShapeSegment (src/services/shapeSegmentService.ts:111:17)
+      at Object.<anonymous> (src/__tests__/shapeSegmentService.test.ts:55:40)
+
+
+Test Suites: 3 passed, 3 total
+Tests:       22 passed, 22 total
 Snapshots:   0 total
-Time:        5.367 s
-Ran all test suites matching /src\\__tests__\\tripPlanner.test.ts|src\\__tests__\\benchmark.test.ts/i.
+Time:        5.515 s
+Ran all test suites.
