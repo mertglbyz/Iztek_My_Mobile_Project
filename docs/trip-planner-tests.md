@@ -1,6 +1,6 @@
 # Trip Planner ve Faz 12 Otomatik Test Raporları
 
-Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir. Tüm hata tolerans, performans ve algoritma testleri **5 ana suite içinde toplam 31 otomatik test başarıyla tamamlanmış** ve sonuçlar aşağıda gruplanmıştır.
+Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir. Tüm hata tolerans, performans ve algoritma testleri **5 ana suite içinde toplam 64 otomatik test başarıyla tamamlanmış** ve sonuçlar aşağıda gruplanmıştır.
 
 ## 1. Trip Planner algoritma testleri
 - **Test Edilen Davranış:** Aynı durak seçimi, uzak duraklar arası aktarma, 150m sınırı altı/üstü durakların yürüyüşe eklenmesi, ters yönlerin filtrelenmesi ve duplikasyon rotaların birleştirilmesi.
@@ -41,7 +41,7 @@ Bu belge, projedeki tüm otomatik testlerin detaylı dökümünü içermektedir.
 - **Test Edilen Davranış:** Ağır GTFS test dosyalarının RAM üzerinden bellek yükü (Node.js performansı) hesaplanması. Isınma süresinin ölçülmesi.
 - **Kullanılan Veri veya Fixture:** Algoritmadan seçilen 30 rastgele durak kombinasyonu (Toplam 120 test tekrarı).
 - **Beklenen Sonuç:** RAM belleklemesi (Isınma/Cold Run) sonrası rota hesaplama süresinin 5ms standardının altında (ideal koşulda 1ms) kalması.
-- **Gerçek Sonuç:** Ortalama süre 0.58 ms, maksimum süre ise zirve koşulda 10.86 ms'de kalarak başarı göstermiştir.
+- **Gerçek Sonuç:** Ortalama süre 1.34 ms, maksimum süre ise zirve koşulda 24.44 ms'de kalarak başarı göstermiştir.
 - **Başarılı veya Başarısız Durumu:** Başarılı
 
 ## 7. Yolculuk detay ekranı ve parametre testleri

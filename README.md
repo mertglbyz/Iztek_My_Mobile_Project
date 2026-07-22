@@ -94,10 +94,10 @@ Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü 
   - Farklı durak çifti sayısı: **30**
   - Toplam ölçüm sayısı: **120**
   - Minimum Süre: **0.01 ms**
-  - Genel Ortalama Süre: **0.57 ms**
-  - Maksimum Süre (Zirve): **12.18 ms**
+  - Genel Ortalama Süre: **1.34 ms**
+  - Maksimum Süre (Zirve): **24.44 ms**
   - Test Ortamı: **Node.js (Jest) / Yerel Donanım**
-  - Test Edilen Commit: **ed169d9**
+  - Test Edilen Commit: **bf1668e**
   - *Isınma Maliyeti:* İlk çalıştırmada veri dosyalarının (JSON) belleğe yüklenmesinden kaynaklanan milisaniyelik bir gecikme (cold run) oluşmaktadır, sonraki çağrılarda süreler hemen 0.00ms civarına düşmektedir. (Ayrıntılı rapor `docs/trip-planner-benchmark.md` içinde)
 
 ### Faz 11 Kapanış Notları
@@ -166,10 +166,11 @@ Bu fazda yürüyüş rotaları servisi provider mimarisi ile yeniden yapılandı
 
 Detaylı teknik doküman için: `docs/faz-13-walking-routing.md`
 
-### Faz 13 Test Kapsamı
-- **5 test suite**, **64 otomatik test** başarıyla tamamlandı
-- Yürüyüş servisi testleri: 34 test (8 kategori — Haversine, provider mimarisi, timeout/hata yönetimi, cache, UI durumları, model validasyonu, mock entegrasyonu)
-- Mevcut Faz 12 testleri (30 test) bozulmadan korundu
+### Faz 13 Kapanış Notları
+- **Harita Deneyimi:** Sentetik/Mock rotalar düz hat ve net görünümlerle kullanıcıya aktarılmaktadır.
+- **Optimizasyonlar:** Arama çubuklarında tespit edilen focus hataları çözülmüş, `FlatList` entegrasyonu düzeltilmiştir. Harita yükleme süreleri hızlandırılmış ve bellek sızıntıları giderilmiştir.
+- **5 test suite**, **64 otomatik test** başarıyla tamamlanmış ve izole edilmiş ortamda doğrulanmıştır.
+- API Sözleşmesi `docs/walking-routing-api-contract.md` eksiksiz oluşturulmuştur.
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. `npm install` — Expo ve React bağımlılıklarını kur.

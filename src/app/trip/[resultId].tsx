@@ -15,7 +15,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface MapData {
     markers: { id: string, coord: { latitude: number, longitude: number }, title: string, type: 'start' | 'transfer' | 'end' }[];
     busPolylines: { coords: { latitude: number, longitude: number }[], color: string }[];
-    walkPolylines: { coords: { latitude: number, longitude: number }[] }[];
+    walkPolylines: { coords: { latitude: number, longitude: number }[], isApproximate: boolean }[];
 }
 
 const getStopNameById = (id: string) => {
@@ -31,6 +31,7 @@ export default function TripDetailScreen() {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState<MapData | null>(null);
     const [shapeMissingWarning, setShapeMissingWarning] = useState(false);
+    const [loadingWalking, setLoadingWalking] = useState(false);
     const mapRef = useRef<MapView>(null);
 
     // Bottom Sheet Animation
@@ -86,6 +87,7 @@ export default function TripDetailScreen() {
         if (!route) return;
 
         let isMounted = true;
+        let timer: NodeJS.Timeout;
         const loadMap = async () => {
             const mData: MapData = { markers: [], busPolylines: [], walkPolylines: [] };
             let missingShape = false;
@@ -110,7 +112,7 @@ export default function TripDetailScreen() {
                     fromId, toId
                 );
                 if (walk.geometry) {
-                    mData.walkPolylines.push({ coords: walk.geometry });
+                    mData.walkPolylines.push({ coords: walk.geometry, isApproximate: walk.isApproximate });
                     fullCoords.push(...walk.geometry);
                 }
             };
@@ -125,6 +127,8 @@ export default function TripDetailScreen() {
                     missingShape = true;
                 }
             };
+
+            setLoadingWalking(true);
 
             if (route.type === 'direct') {
                 const dir = route as DirectRouteResult;
@@ -162,10 +166,12 @@ export default function TripDetailScreen() {
             }
 
             if (isMounted) {
-                setMapData(mData);
+                // Tüm duraklar, otobüs hatları ve yürüyüş yolları tamamlandıktan sonra haritayı güncelle
+                setMapData({...mData});
                 setShapeMissingWarning(missingShape);
+                setLoadingWalking(false);
 
-                setTimeout(() => {
+                timer = setTimeout(() => {
                     if (mapRef.current && fullCoords.length > 0) {
                         mapRef.current.fitToCoordinates(fullCoords, {
                             edgePadding: { top: 40, right: 40, bottom: (SCREEN_HEIGHT - INITIAL_SHEET_Y) + 40, left: 40 },
@@ -177,7 +183,10 @@ export default function TripDetailScreen() {
         };
 
         loadMap();
-        return () => { isMounted = false; };
+        return () => { 
+            isMounted = false;
+            if (timer) clearTimeout(timer);
+        };
     }, [route]);
 
     const buildTimeline = (r: TripPlanResult) => {
@@ -193,11 +202,13 @@ export default function TripDetailScreen() {
 
             // 2. Gerekliyse gerçek biniş durağına yürüyüş
             if (dir.walkingToBoardingMeters) {
+                const durationText = dir.walkingToBoardingDuration ? ` (${Math.ceil(dir.walkingToBoardingDuration / 60)} dk)` : '';
                 steps.push({
                     id: 'walk1', type: 'walk',
-                    title: `Yaklaşık ${dir.walkingToBoardingMeters}m yürüyün`,
-                    subtitle: 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.',
-                    icon: 'walk'
+                    title: `Yaklaşık ${dir.walkingToBoardingMeters}m yürüyün${durationText}`,
+                    subtitle: dir.isApproximate ? 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.' : 'Gerçek yaya güzergâhı',
+                    icon: 'walk',
+                    isApproximate: dir.isApproximate
                 });
             }
 
@@ -225,11 +236,13 @@ export default function TripDetailScreen() {
 
             // 6. Gerekliyse varış durağına yürüyüş
             if (dir.walkingFromAlightingMeters) {
+                const durationText = dir.walkingFromAlightingDuration ? ` (${Math.ceil(dir.walkingFromAlightingDuration / 60)} dk)` : '';
                 steps.push({
                     id: 'walk2', type: 'walk',
-                    title: `Yaklaşık ${dir.walkingFromAlightingMeters}m yürüyün`,
-                    subtitle: 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.',
-                    icon: 'walk'
+                    title: `Yaklaşık ${dir.walkingFromAlightingMeters}m yürüyün${durationText}`,
+                    subtitle: dir.isApproximate ? 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.' : 'Gerçek yaya güzergâhı',
+                    icon: 'walk',
+                    isApproximate: dir.isApproximate
                 });
             }
 
@@ -246,11 +259,13 @@ export default function TripDetailScreen() {
 
             // 2. Gerekliyse ilk durağa yürüyüş
             if (trans.walkingToBoardingMeters) {
+                const durationText = trans.walkingToBoardingDuration ? ` (${Math.ceil(trans.walkingToBoardingDuration / 60)} dk)` : '';
                 steps.push({
                     id: 'walk1', type: 'walk',
-                    title: `Yaklaşık ${trans.walkingToBoardingMeters}m yürüyün`,
-                    subtitle: 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.',
-                    icon: 'walk'
+                    title: `Yaklaşık ${trans.walkingToBoardingMeters}m yürüyün${durationText}`,
+                    subtitle: trans.isApproximate ? 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.' : 'Gerçek yaya güzergâhı',
+                    icon: 'walk',
+                    isApproximate: trans.isApproximate
                 });
             }
 
@@ -289,11 +304,13 @@ export default function TripDetailScreen() {
 
             // 9. Gerekliyse varış durağına yürüyüş
             if (trans.walkingFromAlightingMeters) {
+                const durationText = trans.walkingFromAlightingDuration ? ` (${Math.ceil(trans.walkingFromAlightingDuration / 60)} dk)` : '';
                 steps.push({
                     id: 'walk2', type: 'walk',
-                    title: `Yaklaşık ${trans.walkingFromAlightingMeters}m yürüyün`,
-                    subtitle: 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.',
-                    icon: 'walk'
+                    title: `Yaklaşık ${trans.walkingFromAlightingMeters}m yürüyün${durationText}`,
+                    subtitle: trans.isApproximate ? 'Yaklaşık kuş uçuşu bağlantıdır; gerçek yaya güzergâhı değildir.' : 'Gerçek yaya güzergâhı',
+                    icon: 'walk',
+                    isApproximate: trans.isApproximate
                 });
             }
 
@@ -348,10 +365,19 @@ export default function TripDetailScreen() {
                 activeOpacity={0.7}
             >
                 <View style={styles.stepLeft}>
-                    <View style={[styles.stepIconContainer, item.type === 'walk' && { backgroundColor: Colors.gray300 }]}>
-                        <Ionicons name={item.icon} size={18} color={item.type === 'walk' ? Colors.textSecondary : Colors.primary} />
+                    <View style={[styles.stepIconContainer, item.type === 'walk' && { backgroundColor: item.isApproximate ? Colors.gray300 : Colors.successSoft }]}>
+                        <Ionicons name={item.icon} size={18} color={item.type === 'walk' ? (item.isApproximate ? Colors.textSecondary : Colors.success) : Colors.primary} />
                     </View>
-                    {!isLast && <View style={[styles.stepLine, item.type === 'walk' && { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.textDisabled, backgroundColor: 'transparent' }]} />}
+                    {!isLast && (
+                        <View style={[
+                            styles.stepLine, 
+                            (item.type === 'walk' || (steps[index + 1] && steps[index + 1].type === 'walk')) 
+                                ? (item.isApproximate || (steps[index + 1] && steps[index + 1].isApproximate) 
+                                    ? { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.textDisabled, backgroundColor: 'transparent' } 
+                                    : { backgroundColor: Colors.success })
+                                : {}
+                        ]} />
+                    )}
                 </View>
                 <View style={styles.stepRight}>
                     <Text style={[styles.stepTitle, isTouchable && styles.touchableText]}>{item.title}</Text>
@@ -381,10 +407,17 @@ export default function TripDetailScreen() {
                         } : undefined}
                     >
                         {mapData.walkPolylines.map((wp, i) => (
-                            <Polyline key={`walk-${i}`} coordinates={wp.coords} strokeColor={Colors.textSecondary} strokeWidth={3} lineDashPattern={[5, 10]} />
+                            <Polyline 
+                                key={`walk-${i}-${wp.coords.length}`} 
+                                coordinates={wp.coords} 
+                                strokeColor={wp.isApproximate ? Colors.textSecondary : Colors.success} 
+                                strokeWidth={wp.isApproximate ? 4 : 6} 
+                                lineDashPattern={wp.isApproximate ? [5, 10] : undefined} 
+                                zIndex={2} 
+                            />
                         ))}
                         {mapData.busPolylines.map((bp, i) => (
-                            <Polyline key={`bus-${i}`} coordinates={bp.coords} strokeColor={bp.color} strokeWidth={5} />
+                            <Polyline key={`bus-${i}`} coordinates={bp.coords} strokeColor={bp.color} strokeWidth={5} zIndex={1} />
                         ))}
                         {mapData.markers.map((m) => (
                             <Marker key={m.id} coordinate={m.coord} title={m.title} description={m.type === 'start' ? 'Başlangıç' : m.type === 'transfer' ? 'Aktarma' : 'Varış'} pinColor={m.type === 'start' ? Colors.success : m.type === 'transfer' ? Colors.warning : Colors.primary} />
@@ -409,6 +442,24 @@ export default function TripDetailScreen() {
                             <Ionicons name="alert-circle" size={18} color={Colors.warning} />
                             <Text style={styles.warningBannerText}>
                                 GTFS güzergâhı eksik (Kuş uçuşu iptal).
+                            </Text>
+                        </View>
+                    )}
+
+                    {loadingWalking && (
+                        <View style={[styles.warningBanner, { backgroundColor: Colors.primarySoft, borderBottomColor: Colors.primary }]}>
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                            <Text style={[styles.warningBannerText, { color: Colors.primaryDark }]}>
+                                Yaya rotası hesaplanıyor...
+                            </Text>
+                        </View>
+                    )}
+
+                    {!loadingWalking && route.totalWalkingMeters > 0 && route.isApproximate && (
+                        <View style={[styles.warningBanner, { backgroundColor: Colors.warningSoft, borderBottomColor: Colors.warning }]}>
+                            <Ionicons name="walk" size={18} color={Colors.warning} />
+                            <Text style={styles.warningBannerText}>
+                                Gerçek yaya güzergâhı alınamadı. Yaklaşık bağlantı gösteriliyor.
                             </Text>
                         </View>
                     )}

@@ -7,7 +7,7 @@ import { BusStop } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type SearchState = 'idle' | 'searching' | 'results' | 'not_found' | 'error';
 
@@ -251,7 +251,7 @@ export default function DirectionsScreen() {
             <View style={[styles.formCard, { marginHorizontal: 0, marginTop: 0 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
-                        <View style={[styles.inputRow, activeInput === 'origin' && { zIndex: 50, elevation: 5 }]}>
+                        <View style={[styles.inputRow, { zIndex: 50, elevation: 5 }]}>
                             <View style={styles.dotGreen} />
                             <TextInput
                                 style={styles.input}
@@ -287,7 +287,7 @@ export default function DirectionsScreen() {
                             )}
                         </View>
                         <View style={styles.divider} />
-                        <View style={[styles.inputRow, activeInput === 'dest' && { zIndex: 50, elevation: 5 }]}>
+                        <View style={[styles.inputRow, { zIndex: 40, elevation: 4 }]}>
                             <View style={styles.dotRed} />
                             <TextInput
                                 style={styles.input}
@@ -363,6 +363,7 @@ export default function DirectionsScreen() {
     return (
         <View style={styles.container}>
             <ScreenHeader title="Nasıl Giderim" subtitle="GTFS Tabanlı Rota Planlama" />
+            <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             {isFallback && (
                 <View style={{ backgroundColor: Colors.warningSoft, padding: Spacing.sm, marginHorizontal: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.md }}>
@@ -380,17 +381,15 @@ export default function DirectionsScreen() {
                 </View>
             )}
 
-            <FlatList
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                data={searchState === 'results' ? tripResults : []}
-                keyExtractor={(_, index) => index.toString()}
-                ListHeaderComponent={<View>{renderHeader()}</View>}
-                renderItem={renderTripCard}
-            />
-        </View>
+            {renderHeader()}
 
+            {searchState === 'results' && tripResults.map((trip, idx) => (
+                <View key={idx}>
+                    {renderTripCard({ item: trip, index: idx })}
+                </View>
+            ))}
+            </ScrollView>
+        </View>
     );
 }
 

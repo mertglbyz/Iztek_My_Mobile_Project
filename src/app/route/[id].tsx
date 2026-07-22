@@ -193,6 +193,16 @@ export default function RouteDetailScreen() {
         return () => clearInterval(interval);
     }, [fetchVehicles]);
 
+    const filteredVehicles = useMemo(() => {
+        if (!vehiclesState.data) return [];
+        const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
+
+        return vehiclesState.data.filter(bus => {
+            if (!bus.latitude || !bus.longitude) return false;
+            return String(bus.direction) === expectedDirStr;
+        });
+    }, [vehiclesState.data, selectedDirection]);
+
     // Eğer bu numaradan geçen hiçbir durak yoksa (veya geçersiz input ise) Hata Ekranı
     if (routeStops.length === 0) {
         return (
@@ -221,16 +231,6 @@ export default function RouteDetailScreen() {
             } as any);
         }
     };
-
-    const filteredVehicles = useMemo(() => {
-        if (!vehiclesState.data) return [];
-        const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
-
-        return vehiclesState.data.filter(bus => {
-            if (!bus.latitude || !bus.longitude) return false;
-            return String(bus.direction) === expectedDirStr;
-        });
-    }, [vehiclesState.data, selectedDirection, id]);
 
 
 

@@ -496,7 +496,7 @@ describe('Faz 13 — Walking Routing Service (Provider + Cache + Fallback)', () 
       expect(result.isApproximate).toBe(false);
       expect(result.fromStopId).toBe('STOP_START');
       expect(result.toStopId).toBe('STOP_END');
-      expect(result.geometry.length).toBe(4);
+      expect(result.geometry.length).toBe(3);
 
       delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
     });

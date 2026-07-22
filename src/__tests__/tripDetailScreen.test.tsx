@@ -49,8 +49,13 @@ jest.mock('react-native', () => ({
 jest.mock('react-native-maps', () => {
     const React = require('react');
     const MapView = (props: any) => React.createElement('MapView', props, props.children);
-    MapView.Marker = (props: any) => React.createElement('Marker', props, props.children);
-    MapView.Polyline = (props: any) => React.createElement('Polyline', props, props.children);
+    MapView.displayName = 'MapView';
+    const Marker = (props: any) => React.createElement('Marker', props, props.children);
+    Marker.displayName = 'Marker';
+    MapView.Marker = Marker;
+    const Polyline = (props: any) => React.createElement('Polyline', props, props.children);
+    Polyline.displayName = 'Polyline';
+    MapView.Polyline = Polyline;
     return MapView;
 });
 
@@ -74,6 +79,7 @@ describe('Trip Detail Screen Tests', () => {
         const output = JSON.stringify(component.toJSON());
         expect(output).toContain('Rota hesaplanırken bir hata oluştu veya sonuç bulunamadı.');
         expect(output).toContain('Rota Sonuçlarına Dön');
+        component.unmount();
     });
 
     it('eksik baslangic veya varis duragi parametresi uygulamayi cokertmez, kontrollu hata verir', async () => {
@@ -93,6 +99,7 @@ describe('Trip Detail Screen Tests', () => {
 
         const output = JSON.stringify(component.toJSON());
         expect(output).toContain('Rota hesaplanırken bir hata oluştu veya sonuç bulunamadı');
+        component.unmount();
     });
 
     it('gecerli parametreler bulunmasina ragmen rota bulunamazsa geri donus secenegi sunar', async () => {
@@ -114,6 +121,7 @@ describe('Trip Detail Screen Tests', () => {
         const output = JSON.stringify(component.toJSON());
         expect(output).toContain('Rota hesaplanırken bir hata oluştu veya sonuç bulunamadı');
         expect(output).toContain('Rota Sonuçlarına Dön');
+        component.unmount();
     });
 
     it('shape bulunamadiginda detay ekrani cokmeden uyari gosterir', async () => {
@@ -149,6 +157,7 @@ describe('Trip Detail Screen Tests', () => {
 
         const output = JSON.stringify(component.toJSON());
         expect(output).toContain('GTFS güzergâhı eksik (Kuş uçuşu iptal)');
+        component.unmount();
     });
 
 });

@@ -2,6 +2,8 @@ import nearbyStopsIndexRaw from '@/data/gtfs/nearby_stops_index.json';
 import patternTripShapeIndexRaw from '@/data/gtfs/pattern_trip_shape_index.json';
 import routePatternsRaw from '@/data/gtfs/route_patterns.json';
 import stopRoutesIndexRaw from '@/data/gtfs/stop_routes_index.json';
+import plannerStopsRaw from '@/data/gtfs/planner_stops.json';
+import { getWalkingRoute } from './walkingRoutingService';
 
 interface RouteSequenceInfo {
     routeId: string;
@@ -46,8 +48,11 @@ export interface DirectRouteResult {
     actualBoardingStopId?: string;
     actualAlightingStopId?: string;
     walkingToBoardingMeters?: number;
+    walkingToBoardingDuration?: number;
     walkingFromAlightingMeters?: number;
+    walkingFromAlightingDuration?: number;
     totalWalkingMeters: number;
+    isApproximate: boolean;
     stopCount: number;
     totalStopCount: number;
     transferCount: number;
@@ -74,8 +79,11 @@ export interface TransferRouteResult {
     actualBoardingStopId?: string;
     actualAlightingStopId?: string;
     walkingToBoardingMeters?: number;
+    walkingToBoardingDuration?: number;
     walkingFromAlightingMeters?: number;
+    walkingFromAlightingDuration?: number;
     totalWalkingMeters: number;
+    isApproximate: boolean;
     firstSegmentStopCount: number;
     secondSegmentStopCount: number;
     totalStopCount: number;
@@ -163,7 +171,10 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
                                         actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
                                         walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
                                         walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
+                                        walkingToBoardingDuration: startCand.walkMeters > 0 ? Math.round(startCand.walkMeters / 1.4) : undefined,
+                                        walkingFromAlightingDuration: endCand.walkMeters > 0 ? Math.round(endCand.walkMeters / 1.4) : undefined,
                                         totalWalkingMeters: totalWalk,
+                                        isApproximate: true,
                                         stopCount: endIdx - startIdx,
                                         totalStopCount: endIdx - startIdx,
                                         transferCount: 0
@@ -266,7 +277,10 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
                                         actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
                                         walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
                                         walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
+                                        walkingToBoardingDuration: startCand.walkMeters > 0 ? Math.round(startCand.walkMeters / 1.4) : undefined,
+                                        walkingFromAlightingDuration: endCand.walkMeters > 0 ? Math.round(endCand.walkMeters / 1.4) : undefined,
                                         totalWalkingMeters: totalWalk,
+                                        isApproximate: true,
                                         firstSegmentStopCount: firstSegmentStops,
                                         secondSegmentStopCount: secondSegmentStops,
                                         totalStopCount: bestTotalStops,
@@ -281,39 +295,98 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
         }
     }
 
-    // 3. KATEGORİK SIRALAMA — Gereksinim Sırasıyla (Maddeler ayrı ayrı uygulanır)
-    // Kural 1: Aktarmasız rotalar > Tek aktarmalı rotalar
-    // Kural 2: Daha az yaklaşık yürüyüş mesafesi
-    // Kural 3: Daha az toplam durak sayısı
-    // Kural 4: Eşitlik durumunda hat numarasına göre alfabetik
-    const allResults: TripPlanResult[] = [...Array.from(directMap.values()), ...Array.from(transferMap.values())];
+    // 3. KATEGORİK SIRALAMA — İlk Yaklaşık Sıralama (Haversine Ön Filtre)
+    let allResults: TripPlanResult[] = [...Array.from(directMap.values()), ...Array.from(transferMap.values())];
 
     allResults.sort((a, b) => {
-        // Kural 1: Aktarmasız rotalar önce
         if (a.type !== b.type) {
             return a.type === 'direct' ? -1 : 1;
         }
-
-        // Kural 2: Daha az yürüyüş mesafesi önce
         const walkA = (a.walkingToBoardingMeters || 0) + (a.walkingFromAlightingMeters || 0);
         const walkB = (b.walkingToBoardingMeters || 0) + (b.walkingFromAlightingMeters || 0);
         if (walkA !== walkB) {
             return walkA - walkB;
         }
-
-        // Kural 3: Daha az toplam durak sayısı önce
         const stopsA = a.type === 'direct' ? a.stopCount : a.totalStopCount;
         const stopsB = b.type === 'direct' ? b.stopCount : b.totalStopCount;
         if (stopsA !== stopsB) {
             return stopsA - stopsB;
         }
-
-        // Kural 4: Eşitlik durumunda hat numarasına göre alfabetik
         const idA = a.type === 'direct' ? a.routeId : a.firstRouteId;
         const idB = b.type === 'direct' ? b.routeId : b.firstRouteId;
         return idA.localeCompare(idB);
     });
 
-    // 4. SONUÇ LİMİTLEME
-    return allResults.slice(0, 10);
+    // En güçlü adayları al (Performans için top 10) ve Backend doğrulaması yap (Faz 13)
+    let topCandidates = allResults.slice(0, 10);
+
+    await Promise.all(topCandidates.map(async (result) => {
+        let realTotalWalk = 0;
+        let isApprox = false;
+
+        const processWalk = async (
+            fromId: string,
+            toId: string,
+            isBoarding: boolean
+        ) => {
+            const fs = (plannerStopsRaw as any[]).find(x => x.id === fromId);
+            const ts = (plannerStopsRaw as any[]).find(x => x.id === toId);
+            if (fs && ts) {
+                try {
+                    const walk = await getWalkingRoute(
+                        { latitude: fs.latitude, longitude: fs.longitude },
+                        { latitude: ts.latitude, longitude: ts.longitude },
+                        fromId, toId
+                    );
+                    if (isBoarding) {
+                        result.walkingToBoardingMeters = walk.distanceMeters;
+                        result.walkingToBoardingDuration = walk.durationSeconds;
+                    } else {
+                        result.walkingFromAlightingMeters = walk.distanceMeters;
+                        result.walkingFromAlightingDuration = walk.durationSeconds;
+                    }
+                    if (walk.isApproximate) isApprox = true;
+                    realTotalWalk += walk.distanceMeters;
+                } catch(e) {
+                    if (isBoarding) realTotalWalk += (result.walkingToBoardingMeters || 0);
+                    else realTotalWalk += (result.walkingFromAlightingMeters || 0);
+                    isApprox = true;
+                }
+            }
+        };
+
+        const walks: Promise<void>[] = [];
+        if (result.walkingToBoardingMeters && result.actualBoardingStopId) {
+            walks.push(processWalk(startStopId, result.actualBoardingStopId, true));
+        }
+        if (result.walkingFromAlightingMeters && result.actualAlightingStopId) {
+            walks.push(processWalk(result.actualAlightingStopId, endStopId, false));
+        }
+
+        await Promise.all(walks);
+
+        result.totalWalkingMeters = realTotalWalk;
+        if (!result.walkingToBoardingMeters && !result.walkingFromAlightingMeters) {
+            result.isApproximate = false;
+        } else {
+            result.isApproximate = isApprox;
+        }
+    }));
+
+    // 4. Nihai Sıralama (Gerçek Yürüyüş Değerleriyle)
+    topCandidates.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'direct' ? -1 : 1;
+        const walkA = (a.walkingToBoardingMeters || 0) + (a.walkingFromAlightingMeters || 0);
+        const walkB = (b.walkingToBoardingMeters || 0) + (b.walkingFromAlightingMeters || 0);
+        if (walkA !== walkB) return walkA - walkB;
+        const stopsA = a.type === 'direct' ? a.stopCount : a.totalStopCount;
+        const stopsB = b.type === 'direct' ? b.stopCount : b.totalStopCount;
+        if (stopsA !== stopsB) return stopsA - stopsB;
+        const idA = a.type === 'direct' ? a.routeId : a.firstRouteId;
+        const idB = b.type === 'direct' ? b.routeId : b.firstRouteId;
+        return idA.localeCompare(idB);
+    });
+
+    // 5. SONUÇ LİMİTLEME
+    return topCandidates.slice(0, 10);
 };

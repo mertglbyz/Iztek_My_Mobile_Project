@@ -239,23 +239,22 @@ class MockWalkingProvider implements WalkingRouteProvider {
 
     // Sentetik bir yaya rotası oluştur: başlangıç ve varış arasında
     // 3 ara nokta ekleyerek düz çizgi yerine kırık bir hat simüle et
-    const midLat1 = from.latitude + (to.latitude - from.latitude) * 0.3;
-    const midLon1 = from.longitude + (to.longitude - from.longitude) * 0.3;
-    const midLat2 = from.latitude + (to.latitude - from.latitude) * 0.6;
-    const midLon2 = from.longitude + (to.longitude - from.longitude) * 0.6;
+    const dLat = to.latitude - from.latitude;
+    const dLon = to.longitude - from.longitude;
+    const midLat1 = from.latitude + dLat * 0.5;
+    const midLon1 = from.longitude + dLon * 0.5;
 
     return {
       fromStopId,
       toStopId,
-      distanceMeters,
-      durationSeconds: Math.round(distanceMeters / WALK_SPEED_MPS),
+      distanceMeters: Math.round(distanceMeters * 1.3), // Kırıklı çizgi daha uzundur
+      durationSeconds: Math.round((distanceMeters * 1.3) / WALK_SPEED_MPS),
       source: 'mock-provider',
       isApproximate: false,
       retrievedAt: generateIsoTimestamp(),
       geometry: [
         { latitude: from.latitude, longitude: from.longitude },
         { latitude: midLat1, longitude: midLon1 },
-        { latitude: midLat2, longitude: midLon2 },
         { latitude: to.latitude, longitude: to.longitude },
       ],
     };
@@ -287,11 +286,12 @@ class WalkingRouteCache {
     fromLat: number,
     fromLon: number,
     toLat: number,
-    toLon: number
+    toLon: number,
+    mode: string = 'walk'
   ): string {
     // Koordinatları 5 ondalık basamağa yuvarlayarak key üret
     const round = (n: number) => Math.round(n * 100000) / 100000;
-    return `${round(fromLat)},${round(fromLon)}|${round(toLat)},${round(toLon)}`;
+    return `${mode}|${round(fromLat)},${round(fromLon)}|${round(toLat)},${round(toLon)}`;
   }
 
   get(

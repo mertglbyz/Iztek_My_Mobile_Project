@@ -1,3 +1,4 @@
+/* global __dirname, require, module, console, process, Buffer */
 const fs = require('fs');
 const readline = require('readline');
 const path = require('path');
@@ -449,10 +450,9 @@ async function runImport() {
     if (fs.existsSync(oldStopsPath)) {
         const oldStopsText = fs.readFileSync(oldStopsPath, 'utf8');
         try {
-            const oldStopsArr = typeof JSON.parse(oldStopsText) === 'array' ? JSON.parse(oldStopsText) : Object.values(JSON.parse(oldStopsText)); // Eğer array degilse obj map
-            // Note: Our stops.json is an array of objects
-            const oldStopsData = JSON.parse(oldStopsText);
-
+            const parsedOld = JSON.parse(oldStopsText);
+            const oldStopsData = Array.isArray(parsedOld) ? parsedOld : Object.values(parsedOld);
+            
             let missingInGtfs = 0;
             let newlyDiscoveredInGtfs = 0;
             let nameMismatchCount = 0;
