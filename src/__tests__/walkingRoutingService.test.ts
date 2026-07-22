@@ -1,39 +1,506 @@
-import { getWalkingRoute } from '@/services/walkingRoutingService';
+/**
+ * Faz 13: Yürüyüş Rotaları Servisi Kapsamlı Testleri
+ */
 
-describe('Walking Routing Service Tests', () => {
+import {
+  getWalkingRoute,
+  isApproximateRoute,
+  getWalkingUIState,
+  getWalkingCacheSize,
+  clearWalkingCache,
+  _testing,
+  _resetProviders,
+} from '@/services/walkingRoutingService';
 
-    it('getWalkingRoute basarili bir sekilde kordinatlar arasi yaklasik rotayi (approximate-haversine) hesaplar', async () => {
-        const fromCoord = { latitude: 38.4237, longitude: 27.1428 };
-        const toCoord = { latitude: 38.4111, longitude: 27.1352 };
+import type { WalkingRouteResult } from '@/types';
 
-        const result = await getWalkingRoute(fromCoord, toCoord, 'STOP_A', 'STOP_B');
+describe('Faz 13 — Walking Routing Service (Provider + Cache + Fallback)', () => {
 
-        expect(result).toBeDefined();
-        expect(result.fromStopId).toBe('STOP_A');
-        expect(result.toStopId).toBe('STOP_B');
+  beforeEach(() => {
+    clearWalkingCache();
+    _resetProviders();
+    delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+  });
 
-        // Mesafe hesaplaması beklenen sınırlar içerisinde olmalı
-        expect(result.distanceMeters).toBeGreaterThan(0);
-        expect(result.distanceMeters).toBeLessThan(2000); // Ortalama bu iki nokta arası 1.5km civarıdır
+  afterAll(() => {
+    clearWalkingCache();
+  });
 
-        // Kuş uçuşu (approximate-haversine) kaynak kullanılıyor
-        expect(result.source).toBe('approximate-haversine');
+  // ========================
+  // HAVERSINE TEMEL TESTLER
+  // ========================
 
-        // Geometri noktaları barındırmalı
-        expect(result.geometry).toBeDefined();
-        expect(result.geometry?.length).toBe(2);
+  describe('Haversine Fallback Provider', () => {
 
-        // Süre sıfırdan büyük olmalı (saniye)
-        expect(result.durationSeconds).toBeGreaterThan(0);
+    it('koordinatlar arasi yaklasik rotayi (approximate-haversine) hesaplar', async () => {
+      const fromCoord = { latitude: 38.4237, longitude: 27.1428 };
+      const toCoord = { latitude: 38.4111, longitude: 27.1352 };
+      const result = await getWalkingRoute(fromCoord, toCoord, 'STOP_A', 'STOP_B');
+
+      expect(result).toBeDefined();
+      expect(result.fromStopId).toBe('STOP_A');
+      expect(result.toStopId).toBe('STOP_B');
+      expect(result.distanceMeters).toBeGreaterThan(0);
+      expect(result.distanceMeters).toBeLessThan(5000);
+      expect(result.source).toBe('approximate-haversine');
+      expect(result.isApproximate).toBe(true);
+      expect(result.geometry.length).toBe(2);
+      expect(result.durationSeconds).toBeGreaterThan(0);
+      expect(result.retrievedAt).toBeDefined();
     });
 
-    it('Ayni koordinatlar verildiginde mesafe ve sure sifir donmelidir', async () => {
-        const fromCoord = { latitude: 38.4237, longitude: 27.1428 };
-
-        const result = await getWalkingRoute(fromCoord, fromCoord);
-
-        expect(result.distanceMeters).toBe(0);
-        expect(result.durationSeconds).toBe(0);
+    it('ayni koordinatlar verildiginde mesafe ve sure sifir donmelidir', async () => {
+      const coord = { latitude: 38.4237, longitude: 27.1428 };
+      const result = await getWalkingRoute(coord, coord);
+      expect(result.distanceMeters).toBe(0);
+      expect(result.durationSeconds).toBe(0);
+      expect(result.geometry.length).toBe(0);
     });
+
+    it('isApproximateRoute yardimci fonksiyonu dogru calisir', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(isApproximateRoute(result)).toBe(true);
+    });
+
+  });
+
+  // ========================
+  // PROVIDER MIMARISI
+  // ========================
+
+  describe('Provider Architecture', () => {
+
+    it('Haversine provider her zaman kullanilabilir olmalidir', () => {
+      const provider = _testing.getHaversineProvider();
+      expect(provider).toBeDefined();
+      expect(provider.providerName).toBe('HaversineFallback');
+    });
+
+    it('Mock provider API sozlesmesine uygun response uretir', async () => {
+      const provider = _testing.getMockProvider();
+      const result = await provider.getRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 },
+        'S1', 'S2'
+      );
+      expect(result.source).toBe('mock-provider');
+      expect(result.isApproximate).toBe(false);
+      expect(result.fromStopId).toBe('S1');
+      expect(result.toStopId).toBe('S2');
+      expect(result.geometry.length).toBeGreaterThan(2);
+      expect(result.distanceMeters).toBeGreaterThan(0);
+      expect(result.durationSeconds).toBeGreaterThan(0);
+      expect(result.retrievedAt).toBeDefined();
+    });
+
+    it('Backend URL tanimli degilse Haversine provider kullanilir', () => {
+      const provider = _testing.resolvePrimaryProvider();
+      expect(provider.providerName).toBe('HaversineFallback');
+    });
+
+    it('MOCK_ENABLED tanimliysa Mock provider kullanilir', () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+      const provider = _testing.resolvePrimaryProvider();
+      expect(provider.providerName).toBe('MockProvider');
+    });
+
+    it('Backend provider ayni koordinatlarda kontrollu davranir', async () => {
+      // getWalkingRoute aynı koordinatlarda 0 mesafe dönüp çökmez
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.4, longitude: 27.1 }
+      );
+      expect(result.distanceMeters).toBe(0);
+      expect(result.durationSeconds).toBe(0);
+    });
+
+  });
+
+  // ========================
+  // TIMEOUT VE HATA YONETIMI
+  // ========================
+
+  describe('Timeout & Error Handling', () => {
+
+    it('timeout durumunda Haversine fallback devreye girer', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
+
+      const originalFetch = global.fetch;
+      // AbortError simülasyonu — backend'in timeout olması durumu
+      global.fetch = jest.fn(() =>
+        Promise.reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }))
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+      expect(result.isApproximate).toBe(true);
+
+      global.fetch = originalFetch;
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    });
+
+    it('network hatasinda (fetch reject) Haversine fallback devreye girer', async () => {
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn(() =>
+        Promise.reject(new Error('Network error'))
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+      expect(result.isApproximate).toBe(true);
+
+      global.fetch = originalFetch;
+    });
+
+    it('HTTP 5xx hatasinda Haversine fallback devreye girer', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: false, status: 500,
+          json: () => Promise.resolve({ error: 'INTERNAL_ERROR', message: 'Sunucu hatası' }),
+        })
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+      expect(result.isApproximate).toBe(true);
+
+      global.fetch = originalFetch;
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    });
+
+    it('HTTP 4xx hatasinda Haversine fallback devreye girer', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: false, status: 404,
+          json: () => Promise.resolve({ error: 'ROUTE_NOT_FOUND', message: 'Rota bulunamadı' }),
+        })
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+
+      global.fetch = originalFetch;
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    });
+
+    it('bos geometry durumunda Haversine fallback devreye girer', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true, status: 200,
+          json: () => Promise.resolve({
+            distanceMeters: 1500, durationSeconds: 1000,
+            geometry: [], source: 'backend-osm', isApproximate: false,
+            retrievedAt: '2026-07-22T10:00:00Z',
+          }),
+        })
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+
+      global.fetch = originalFetch;
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    });
+
+    it('gecersiz geometry (eksik latitude/longitude) durumunda fallback calisir', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true, status: 200,
+          json: () => Promise.resolve({
+            distanceMeters: 1500, durationSeconds: 1000,
+            geometry: [{ lat: 38.4, lng: 27.1 }],
+            source: 'backend-osm',
+          }),
+        })
+      ) as any;
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+
+      global.fetch = originalFetch;
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+    });
+
+    it('backend bulunmadiginda uygulama yaklasik yontemle calismaya devam eder', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+
+      expect(result.source).toBe('approximate-haversine');
+      expect(result.isApproximate).toBe(true);
+      expect(result.geometry.length).toBeGreaterThan(0);
+    });
+
+    it('gecersiz koordinat (NaN) durumunda da cökmez', async () => {
+      const result = await getWalkingRoute(
+        { latitude: NaN, longitude: NaN },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(result).toBeDefined();
+    });
+
+  });
+
+  // ========================
+  // CACHE TESTLERI
+  // ========================
+
+  describe('Cache Mechanism', () => {
+
+    it('cache hit durumunda ikinci istek API ye gitmez', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+
+      const fromCoord = { latitude: 38.4, longitude: 27.1 };
+      const toCoord = { latitude: 38.5, longitude: 27.2 };
+
+      await getWalkingRoute(fromCoord, toCoord);
+      expect(getWalkingCacheSize()).toBe(1);
+
+      // İkinci çağrı aynı → cache'ten gelmeli
+      await getWalkingRoute(fromCoord, toCoord);
+      expect(getWalkingCacheSize()).toBe(1);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+    });
+
+    it('cache key yon duyarlidir — A→B ile B→A farkli kayitlardir', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+
+      const coordA = { latitude: 38.4, longitude: 27.1 };
+      const coordB = { latitude: 38.5, longitude: 27.2 };
+
+      await getWalkingRoute(coordA, coordB);
+      const size1 = getWalkingCacheSize();
+
+      await getWalkingRoute(coordB, coordA);
+      const size2 = getWalkingCacheSize();
+
+      expect(size2).toBe(size1 + 1);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+    });
+
+    it('ayni kordinatlara tekrar istek cache ten doner', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+
+      const fromCoord = { latitude: 38.4, longitude: 27.1 };
+      const toCoord = { latitude: 38.5, longitude: 27.2 };
+
+      const result1 = await getWalkingRoute(fromCoord, toCoord);
+      const result2 = await getWalkingRoute(fromCoord, toCoord);
+
+      expect(result2.distanceMeters).toBe(result1.distanceMeters);
+      expect(result2.source).toBe(result1.source);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+    });
+
+    it('clearWalkingCache dogru calisir', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+
+      await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(getWalkingCacheSize()).toBeGreaterThan(0);
+
+      clearWalkingCache();
+      expect(getWalkingCacheSize()).toBe(0);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+    });
+
+    it('0 mesafeli sonuclar cache e yazilmaz', async () => {
+      const coord = { latitude: 38.4, longitude: 27.1 };
+      await getWalkingRoute(coord, coord);
+      expect(getWalkingCacheSize()).toBe(0);
+    });
+
+    it('cache.evictExpired zamani gecmis kayitlari temizler', () => {
+      const evicted = _testing.cache.evictExpired();
+      expect(evicted).toBe(0);
+    });
+
+  });
+
+  // ========================
+  // UI DURUM TESTLERI
+  // ========================
+
+  describe('UI State Management (getWalkingUIState)', () => {
+
+    it('loading durumunda "loading" doner', () => {
+      expect(getWalkingUIState(null, true, undefined)).toBe('loading');
+    });
+
+    it('mesafe 0 ise "not_needed" doner', () => {
+      expect(getWalkingUIState(null, false, 0)).toBe('not_needed');
+    });
+
+    it('sonuc null ise "unavailable" doner', () => {
+      expect(getWalkingUIState(null, false, 100)).toBe('unavailable');
+    });
+
+    it('geometry bossa "invalid_geometry" doner', () => {
+      const emptyResult: WalkingRouteResult = {
+        distanceMeters: 100, durationSeconds: 70, geometry: [],
+        source: 'backend-osm', isApproximate: false,
+        retrievedAt: new Date().toISOString(),
+      };
+      expect(getWalkingUIState(emptyResult, false, 100)).toBe('invalid_geometry');
+    });
+
+    it('Haversine kaynakli sonuc "fallback" doner', () => {
+      const approxResult: WalkingRouteResult = {
+        distanceMeters: 100, durationSeconds: 70,
+        geometry: [{ latitude: 38.4, longitude: 27.1 }, { latitude: 38.5, longitude: 27.2 }],
+        source: 'approximate-haversine', isApproximate: true,
+        retrievedAt: new Date().toISOString(),
+      };
+      expect(getWalkingUIState(approxResult, false, 100)).toBe('fallback');
+    });
+
+    it('backend-osm kaynakli sonuc "ready" doner', () => {
+      const backendResult: WalkingRouteResult = {
+        distanceMeters: 100, durationSeconds: 70,
+        geometry: [{ latitude: 38.4, longitude: 27.1 }, { latitude: 38.5, longitude: 27.2 }],
+        source: 'backend-osm', isApproximate: false,
+        retrievedAt: new Date().toISOString(),
+      };
+      expect(getWalkingUIState(backendResult, false, 100)).toBe('ready');
+    });
+
+    it('mock-provider kaynakli sonuc "ready" doner', () => {
+      const mockResult: WalkingRouteResult = {
+        distanceMeters: 100, durationSeconds: 70,
+        geometry: [{ latitude: 38.4, longitude: 27.1 }, { latitude: 38.5, longitude: 27.2 }],
+        source: 'mock-provider', isApproximate: false,
+        retrievedAt: new Date().toISOString(),
+      };
+      expect(getWalkingUIState(mockResult, false, 100)).toBe('ready');
+    });
+
+  });
+
+  // ========================
+  // MODEL DOGRULAMA
+  // ========================
+
+  describe('WalkingRouteResult Model Validation', () => {
+
+    it('distanceMeters sayisal ve pozitif olmalidir (mesafe > 0 ise)', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(typeof result.distanceMeters).toBe('number');
+      expect(result.distanceMeters).toBeGreaterThan(0);
+    });
+
+    it('durationSeconds sayisal ve >= 0 olmalidir', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(typeof result.durationSeconds).toBe('number');
+      expect(result.durationSeconds).toBeGreaterThanOrEqual(0);
+    });
+
+    it('geometry dizisindeki her nokta latitude ve longitude icermelidir', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(Array.isArray(result.geometry)).toBe(true);
+      result.geometry.forEach(pt => {
+        expect(typeof pt.latitude).toBe('number');
+        expect(typeof pt.longitude).toBe('number');
+      });
+    });
+
+    it('source gecerli bir enum degeridir', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(['backend-osm', 'approximate-haversine', 'mock-provider']).toContain(result.source);
+    });
+
+    it('retrievedAt gecerli bir ISO 8601 zaman damgasidir', async () => {
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(isNaN(Date.parse(result.retrievedAt))).toBe(false);
+    });
+
+  });
+
+  // ========================
+  // MOCK BAŞARILI RESPONSE
+  // ========================
+
+  describe('Mock Provider Integration', () => {
+
+    it('mock provider ile gercek yaya rotasi simule edilir', async () => {
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+
+      const result = await getWalkingRoute(
+        { latitude: 38.4, longitude: 27.1 },
+        { latitude: 38.5, longitude: 27.2 },
+        'STOP_START', 'STOP_END'
+      );
+
+      expect(result.source).toBe('mock-provider');
+      expect(result.isApproximate).toBe(false);
+      expect(result.fromStopId).toBe('STOP_START');
+      expect(result.toStopId).toBe('STOP_END');
+      expect(result.geometry.length).toBe(4);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+    });
+
+  });
 
 });

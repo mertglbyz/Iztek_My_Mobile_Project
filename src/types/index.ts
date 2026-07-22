@@ -77,3 +77,40 @@ export interface FavoritesContextType {
 
 /** Konum izin durumu */
 export type LocationPermissionStatus = 'granted' | 'denied' | 'undetermined';
+
+// ============================
+// Faz 13: Yürüyüş Rotaları
+// ============================
+
+/** Yürüyüş rotası sonuç modeli (Walking Route Result) */
+export interface WalkingRouteResult {
+  /** Metre cinsinden yürüme mesafesi */
+  distanceMeters: number;
+  /** Saniye cinsinden tahmini yürüme süresi */
+  durationSeconds: number;
+  /** React Native Maps Polyline için normalize edilmiş koordinat dizisi */
+  geometry: { latitude: number; longitude: number }[];
+  /** Sağlayıcı kaynağı */
+  source: 'backend-osm' | 'approximate-haversine' | 'mock-provider';
+  /** Gerçek rota mı yoksa yaklaşık mı? */
+  isApproximate: boolean;
+  /** Yanıtın alındığı ISO 8601 zaman damgası */
+  retrievedAt: string;
+  /** Opsiyonel: Başlangıç durak ID'si */
+  fromStopId?: string;
+  /** Opsiyonel: Varış durak ID'si */
+  toStopId?: string;
+}
+
+/** Yürüyüş rotası sağlayıcı arayüzü */
+export interface WalkingRouteProvider {
+  /** Sağlayıcı adı (debug ve loglama için) */
+  readonly providerName: string;
+  /** Koordinat çifti için yürüyüş rotası hesapla */
+  getRoute(
+    from: { latitude: number; longitude: number },
+    to: { latitude: number; longitude: number },
+    fromStopId?: string,
+    toStopId?: string
+  ): Promise<WalkingRouteResult>;
+}

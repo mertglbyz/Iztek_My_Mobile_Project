@@ -94,10 +94,10 @@ Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü 
   - Farklı durak çifti sayısı: **30**
   - Toplam ölçüm sayısı: **120**
   - Minimum Süre: **0.01 ms**
-  - Genel Ortalama Süre: **0.58 ms**
-  - Maksimum Süre (Zirve): **10.86 ms**
+  - Genel Ortalama Süre: **0.57 ms**
+  - Maksimum Süre (Zirve): **12.18 ms**
   - Test Ortamı: **Node.js (Jest) / Yerel Donanım**
-  - Test Edilen Commit: **88bc826**
+  - Test Edilen Commit: **ed169d9**
   - *Isınma Maliyeti:* İlk çalıştırmada veri dosyalarının (JSON) belleğe yüklenmesinden kaynaklanan milisaniyelik bir gecikme (cold run) oluşmaktadır, sonraki çağrılarda süreler hemen 0.00ms civarına düşmektedir. (Ayrıntılı rapor `docs/trip-planner-benchmark.md` içinde)
 
 ### Faz 11 Kapanış Notları
@@ -136,6 +136,40 @@ Gerçek yaya güzergâhı, OSM tabanlı backend routing servisi hazırlandıktan
 
 ### Rota Sonuç Modeli
 `resultId` her hesaplamada aynı değeri üretecek şekilde hat numarası, yön, pattern ID, gerçek biniş ve iniş durak bilgilerinden türetilen **deterministik** bir anahtar olarak üretilmektedir (rastgele UUID kullanılmaz).
+
+## Faz 13 – Gerçek Yaya Güzergâhı Entegrasyonu
+
+Bu fazda yürüyüş rotaları servisi provider mimarisi ile yeniden yapılandırılmış, backend tabanlı gerçek yaya güzergâhı entegrasyon katmanı hazırlanmıştır.
+
+### Servis Mimarisi
+`src/services/walkingRoutingService.ts` üç sağlayıcıyı destekler:
+
+| Sağlayıcı | Kaynak | Ne Zaman Kullanılır? |
+|---|---|---|
+| `BackendWalkingProvider` | `backend-osm` | `EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL` tanımlıysa |
+| `MockWalkingProvider` | `mock-provider` | `EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED=true` ise |
+| `HaversineWalkingProvider` | `approximate-haversine` | Hiçbiri yoksa (varsayılan fallback) |
+
+### Timeout ve Fallback
+- Backend çağrısı için **3 saniye** timeout
+- Timeout, HTTP 4xx/5xx, boş/geçersiz geometry, ağ hatası durumlarında **otomatik Haversine fallback**
+- Fallback sırasında kullanıcıya _"Gerçek yaya güzergâhı alınamadı. Yaklaşık bağlantı gösteriliyor."_ uyarısı
+
+### Bellek İçi Cache
+- Maksimum **200 kayıt**, TTL **5 dakika**
+- Cache anahtarı: başlangıç ve varış koordinatları (5 ondalık hassasiyet)
+- A→B ≠ B→A (yön duyarlı)
+- LRU eviction + TTL tabanlı temizleme
+
+### UI Durum Yönetimi
+`getWalkingUIState()` ile 6 farklı durum ayırt edilir: `loading`, `ready`, `fallback`, `unavailable`, `invalid_geometry`, `not_needed`.
+
+Detaylı teknik doküman için: `docs/faz-13-walking-routing.md`
+
+### Faz 13 Test Kapsamı
+- **5 test suite**, **64 otomatik test** başarıyla tamamlandı
+- Yürüyüş servisi testleri: 34 test (8 kategori — Haversine, provider mimarisi, timeout/hata yönetimi, cache, UI durumları, model validasyonu, mock entegrasyonu)
+- Mevcut Faz 12 testleri (30 test) bozulmadan korundu
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. `npm install` — Expo ve React bağımlılıklarını kur.

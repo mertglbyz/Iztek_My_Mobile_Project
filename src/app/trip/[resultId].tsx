@@ -2,7 +2,8 @@ import { BorderRadius, Colors, FontSizes, FontWeights, Spacing } from '@/constan
 import plannerStopsRaw from '@/data/gtfs/planner_stops.json';
 import { getShapeSegment } from '@/services/shapeSegmentService';
 import { DirectRouteResult, findRoutes, TransferRouteResult, TripPlanResult } from '@/services/tripPlanner';
-import { getWalkingRoute } from '@/services/walkingRoutingService';
+import { getWalkingRoute, isApproximateRoute } from '@/services/walkingRoutingService';
+import { WalkingRouteResult } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
