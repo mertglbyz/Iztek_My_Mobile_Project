@@ -4,16 +4,17 @@ import { getShapeSegment } from '@/services/shapeSegmentService';
 import { DirectRouteResult, findRoutes, TransferRouteResult, TripPlanResult } from '@/services/tripPlanner';
 import { getWalkingRoute, isApproximateRoute } from '@/services/walkingRoutingService';
 import { WalkingRouteResult } from '@/types';
-import { Ionicons } from '@expo/vector-icons';
+import { getStopsForRoute } from '@/utils/routeData';
+import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, FlatList, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface MapData {
-    markers: { id: string, coord: { latitude: number, longitude: number }, title: string, type: 'start' | 'transfer' | 'end' }[];
+    markers: { id: string, stopId?: string, coord: { latitude: number, longitude: number }, title: string, type: 'start' | 'transfer' | 'end' | 'waypoint', color?: string }[];
     busPolylines: { coords: { latitude: number, longitude: number }[], color: string }[];
     walkPolylines: { coords: { latitude: number, longitude: number }[], isApproximate: boolean }[];
 }
@@ -74,14 +75,29 @@ export default function TripDetailScreen() {
             return;
         }
 
-        findRoutes(sId, eId).then(results => {
-            const found = results.find(r => r.resultId === resultId);
-            setRoute(found || null);
-            setLoading(false);
-        }).catch(() => {
-            setLoading(false);
-        });
+        const fetchData = async () => {
+            const sId = typeof startStopId === 'string' ? startStopId : '';
+            const eId = typeof endStopId === 'string' ? endStopId : '';
+            if (!resultId || typeof resultId !== 'string' || !sId || !eId) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const results = await findRoutes(sId, eId);
+                const found = results.find(r => r.resultId === resultId);
+                setRoute(found || null);
+            } catch {
+                // handle error
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
     }, [resultId, startStopId, endStopId]);
+
+    // Render optimization removed to prevent iOS marker dropping bugs.
 
     useEffect(() => {
         if (!route) return;
@@ -93,13 +109,14 @@ export default function TripDetailScreen() {
             let missingShape = false;
             const fullCoords: { latitude: number, longitude: number }[] = [];
 
-            // Marker sayacı — Math.random() yerine sabit ve benzersiz key
             let markerCounter = 0;
-            const addMarker = (stopId: string, type: 'start' | 'transfer' | 'end') => {
-                const s = (plannerStopsRaw as any[]).find(x => x.id === stopId);
+            const addMarker = (stopId: string, type: 'start' | 'transfer' | 'end' | 'waypoint', color?: string) => {
+                const s = (plannerStopsRaw as any[]).find(x => String(x.id) === String(stopId) || String(x.stopId) === String(stopId));
                 if (!s) return;
-                mData.markers.push({ id: `${stopId}-${type}-${markerCounter++}`, coord: { latitude: s.latitude, longitude: s.longitude }, title: s.name, type });
-                fullCoords.push({ latitude: s.latitude, longitude: s.longitude });
+                // Aynı rotanın aynı duraktan iki kez geçme (loop) ihtimaline karşı stabil ve benzersiz sayaç (Math.random() kullanılmaz)
+                const uniqueKey = `${stopId}-${type}-${markerCounter++}`;
+                mData.markers.push({ id: uniqueKey, stopId, coord: { latitude: Number(s.latitude), longitude: Number(s.longitude) }, title: s.name, type, color });
+                fullCoords.push({ latitude: Number(s.latitude), longitude: Number(s.longitude) });
             };
 
             const addWalk = async (fromId: string, toId: string) => {
@@ -130,40 +147,56 @@ export default function TripDetailScreen() {
 
             setLoadingWalking(true);
 
-            if (route.type === 'direct') {
-                const dir = route as DirectRouteResult;
-                const boardStop = dir.actualBoardingStopId || dir.boardingStopId;
-                const alightStop = dir.actualAlightingStopId || dir.alightingStopId;
+                const addIntermediateStops = (stopIds: string[]) => {
+                    if (!stopIds || stopIds.length <= 2) return;
+                    
+                    // İlk ve son duraklar zaten Başlangıç/Varış/Aktarma olarak ekleniyor, aradakileri alıyoruz
+                    for (let i = 1; i < stopIds.length - 1; i++) {
+                        const stopId = stopIds[i];
+                        addMarker(stopId, 'waypoint', Colors.primary);
+                    }
+                };
 
-                addMarker(dir.boardingStopId, 'start');
-                if (dir.walkingToBoardingMeters && dir.actualBoardingStopId) await addWalk(dir.boardingStopId, boardStop);
-                if (boardStop !== dir.boardingStopId) addMarker(boardStop, 'start');
+                if (route.type === 'direct') {
+                    const dir = route as DirectRouteResult;
+                    const boardStop = dir.actualBoardingStopId || dir.boardingStopId;
+                    const alightStop = dir.actualAlightingStopId || dir.alightingStopId;
 
-                // shapeId öncelikli olarak kullanılır
-                addBus(dir.shapeId, dir.routeId, dir.directionId, boardStop, alightStop, Colors.primary);
+                    addMarker(dir.boardingStopId, 'start');
+                    if (dir.walkingToBoardingMeters && dir.actualBoardingStopId) await addWalk(dir.boardingStopId, boardStop);
+                    if (boardStop !== dir.boardingStopId) addMarker(boardStop, 'waypoint', Colors.primary);
 
-                addMarker(alightStop, 'end');
-                if (dir.walkingFromAlightingMeters && dir.actualAlightingStopId) await addWalk(alightStop, dir.alightingStopId);
-                // Varış durağı her zaman eklenir (yürüyüş olsun ya da olmasın)
-                if (alightStop !== dir.alightingStopId) addMarker(dir.alightingStopId, 'end');
-            } else {
-                const trans = route as TransferRouteResult;
-                const boardStop = trans.actualBoardingStopId || trans.boardingStopId;
-                const alightStop = trans.actualAlightingStopId || trans.alightingStopId;
+                    addIntermediateStops(dir.segmentStopIds);
 
-                addMarker(trans.boardingStopId, 'start');
-                if (trans.walkingToBoardingMeters && trans.actualBoardingStopId) await addWalk(trans.boardingStopId, boardStop);
-                if (boardStop !== trans.boardingStopId) addMarker(boardStop, 'start');
+                    addBus(dir.shapeId, dir.routeId, dir.directionId, boardStop, alightStop, '#000000');
 
-                addBus(trans.firstShapeId, trans.firstRouteId, trans.firstDirectionId, boardStop, trans.transferStopId, Colors.primary);
-                addMarker(trans.transferStopId, 'transfer');
-                addBus(trans.secondShapeId, trans.secondRouteId, trans.secondDirectionId, trans.transferStopId, alightStop, Colors.accent || '#9b59b6');
+                    if (alightStop !== dir.alightingStopId) addMarker(alightStop, 'waypoint', Colors.primary);
+                    if (dir.walkingFromAlightingMeters && dir.actualAlightingStopId) await addWalk(alightStop, dir.alightingStopId);
+                    addMarker(dir.alightingStopId, 'end');
+                } else {
+                    const trans = route as TransferRouteResult;
+                    const boardStop = trans.actualBoardingStopId || trans.boardingStopId;
+                    const alightStop = trans.actualAlightingStopId || trans.alightingStopId;
 
-                addMarker(alightStop, 'end');
-                if (trans.walkingFromAlightingMeters && trans.actualAlightingStopId) await addWalk(alightStop, trans.alightingStopId);
-                // Varış durağı her zaman eklenir
-                if (alightStop !== trans.alightingStopId) addMarker(trans.alightingStopId, 'end');
-            }
+                    addMarker(trans.boardingStopId, 'start');
+                    if (trans.walkingToBoardingMeters && trans.actualBoardingStopId) await addWalk(trans.boardingStopId, boardStop);
+                    if (boardStop !== trans.boardingStopId) addMarker(boardStop, 'waypoint', Colors.primary);
+
+                    addIntermediateStops(trans.firstSegmentStopIds);
+
+                    // Aktarma 1. Ayak: Siyah Çizgi (Kullanıcı talebi)
+                    addBus(trans.firstShapeId, trans.firstRouteId, trans.firstDirectionId, boardStop, trans.transferStopId, '#000000');
+                    addMarker(trans.transferStopId, 'transfer');
+                    
+                    addIntermediateStops(trans.secondSegmentStopIds);
+
+                    // Aktarma 2. Ayak: Kalın Yeşil (Siyahla uyumlu)
+                    addBus(trans.secondShapeId, trans.secondRouteId, trans.secondDirectionId, trans.transferStopId, alightStop, '#2E7D32');
+
+                    if (alightStop !== trans.alightingStopId) addMarker(alightStop, 'waypoint', Colors.primary);
+                    if (trans.walkingFromAlightingMeters && trans.actualAlightingStopId) await addWalk(alightStop, trans.alightingStopId);
+                    addMarker(trans.alightingStopId, 'end');
+                }
 
             if (isMounted) {
                 // Tüm duraklar, otobüs hatları ve yürüyüş yolları tamamlandıktan sonra haritayı güncelle
@@ -322,6 +355,13 @@ export default function TripDetailScreen() {
         return steps;
     };
 
+    const CustomPin = ({ iconName, color, size = 12 }: { iconName: string, color: string, size?: number }) => (
+        <View style={{ alignItems: 'center', justifyContent: 'center', width: size * 2.5, height: size * 2.5 }}>
+            <MaterialCommunityIcons name="map-marker" size={size * 2.5} color={color} style={{ position: 'absolute' }} />
+            <Ionicons name={iconName as any} size={size * 1.3} color={Colors.white} style={{ position: 'absolute', top: size * 0.3 }} />
+        </View>
+    );
+
     if (loading) {
         return (
             <View style={styles.center}>
@@ -393,7 +433,6 @@ export default function TripDetailScreen() {
 
     return (
         <View style={styles.container}>
-            {/* 1) Static Absolute Map Background */}
             <View style={styles.mapBackgroundContainer}>
                 {mapData ? (
                     <MapView
@@ -419,21 +458,83 @@ export default function TripDetailScreen() {
                         {mapData.busPolylines.map((bp, i) => (
                             <Polyline key={`bus-${i}`} coordinates={bp.coords} strokeColor={bp.color} strokeWidth={5} zIndex={1} />
                         ))}
-                        {mapData.markers.map((m) => (
-                            <Marker key={m.id} coordinate={m.coord} title={m.title} description={m.type === 'start' ? 'Başlangıç' : m.type === 'transfer' ? 'Aktarma' : 'Varış'} pinColor={m.type === 'start' ? Colors.success : m.type === 'transfer' ? Colors.warning : Colors.primary} />
+                        {mapData.markers.map((m) => {
+                            if (m.type === 'waypoint') {
+                                return (
+                                    <Marker 
+                                        key={m.id} 
+                                        coordinate={m.coord} 
+                                        zIndex={10}
+                                    >
+                                        <CustomPin iconName="bus" color={m.color || '#1877F2'} size={14} />
+                                        <Callout tooltip onPress={() => router.push(`/stop/${m.stopId}`)}>
+                                            <View style={styles.eshotCalloutContainer}>
+                                                <View style={styles.eshotCallout}>
+                                                    <View style={styles.eshotCalloutLeft}>
+                                                        <MaterialCommunityIcons name="bus" size={16} color="white" />
+                                                    </View>
+                                                    <View style={styles.eshotCalloutRight}>
+                                                        <Text style={styles.eshotCalloutId} numberOfLines={1}>{m.stopId || ''}</Text>
+                                                        <Text style={styles.eshotCalloutName} numberOfLines={1}>{m.title}</Text>
+                                                    </View>
+                                                </View>
+                                                <MaterialCommunityIcons name="menu-down" size={30} color="white" style={styles.eshotCalloutArrow} />
+                                            </View>
+                                        </Callout>
+                                    </Marker>
+                                );
+                            }
+                            
+                            const isStart = m.type === 'start';
+                            const isEnd = m.type === 'end';
+                            const pinColor = isStart ? Colors.success : isEnd ? Colors.error : Colors.warning;
+                            const iconName = isStart ? 'location' : isEnd ? 'flag' : 'git-compare';
+
+                            return (
+                                <Marker 
+                                    key={m.id} 
+                                    coordinate={m.coord} 
+                                    zIndex={20}
+                                >
+                                    <CustomPin iconName={iconName} color={pinColor} size={16} />
+                                    <Callout tooltip onPress={m.stopId ? () => router.push(`/stop/${m.stopId}`) : undefined}>
+                                        <View style={styles.eshotCalloutContainer}>
+                                            <View style={styles.eshotCallout}>
+                                                <View style={[styles.eshotCalloutLeft, { backgroundColor: pinColor }]}>
+                                                    <Ionicons name={iconName} size={16} color="white" />
+                                                </View>
+                                                <View style={styles.eshotCalloutRight}>
+                                                    <Text style={styles.eshotCalloutId} numberOfLines={1}>{m.title}</Text>
+                                                    <Text style={styles.eshotCalloutName} numberOfLines={1}>{isStart ? 'Başlangıç Noktası' : isEnd ? 'Varış Noktası' : 'Aktarma Noktası'}</Text>
+                                                </View>
+                                            </View>
+                                            <MaterialCommunityIcons name="menu-down" size={30} color="white" style={styles.eshotCalloutArrow} />
+                                        </View>
+                                    </Callout>
+                                </Marker>
+                            );
+                        })}
+                        {mapData.walkPolylines.map((wp, i) => (
+                            <Polyline 
+                                key={`walk-${i}-${wp.coords.length}`} 
+                                coordinates={wp.coords} 
+                                strokeColor={wp.isApproximate ? Colors.textSecondary : Colors.success} 
+                                strokeWidth={wp.isApproximate ? 4 : 6} 
+                                lineDashPattern={wp.isApproximate ? [5, 10] : undefined} 
+                                zIndex={2} 
+                            />
+                        ))}
+                        {mapData.busPolylines.map((bp, i) => (
+                            <Polyline key={`bus-${i}`} coordinates={bp.coords} strokeColor={bp.color} strokeWidth={5} zIndex={1} />
                         ))}
                     </MapView>
                 ) : (
-                    <View style={styles.mapPlaceholder}>
-                        <ActivityIndicator size="large" color={Colors.primary} />
-                    </View>
+                    <ActivityIndicator size="large" color={Colors.primary} />
                 )}
             </View>
 
-            {/* 2) Draggable Bottom Sheet */}
             <Animated.View style={[styles.bottomSheetContainer, { top: sheetY }]}>
 
-                {/* Header containing PanResponder */}
                 <View {...panResponder.panHandlers} style={styles.sheetHeaderWrapper}>
                     <View style={styles.sheetGrabber} />
 
@@ -477,7 +578,6 @@ export default function TripDetailScreen() {
                     </View>
                 </View>
 
-                {/* Content (Timeline FlatList) */}
                 <FlatList
                     style={{ flex: 1 }}
                     data={steps}
@@ -517,6 +617,45 @@ const styles = StyleSheet.create({
     backBtn: { marginRight: Spacing.md },
     headerTitle: { fontSize: FontSizes.lg, fontWeight: FontWeights.bold, color: Colors.textPrimary },
     headerSubtitle: { fontSize: FontSizes.sm, color: Colors.textSecondary, marginTop: 2 },
+    calloutSubtitle: { fontSize: FontSizes.xs, color: Colors.textSecondary, marginTop: 2 },
+    eshotCalloutContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    eshotCallout: {
+        flexDirection: 'row',
+        backgroundColor: 'white',
+        overflow: 'hidden',
+        borderRadius: 2,
+        width: 170,
+        height: 44,
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    eshotCalloutLeft: {
+        width: 36,
+        backgroundColor: '#555555',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    eshotCalloutRight: {
+        flex: 1,
+        paddingHorizontal: 8,
+        justifyContent: 'center',
+    },
+    eshotCalloutId: {
+        fontWeight: 'bold',
+        fontSize: 13,
+        color: '#000',
+    },
+    eshotCalloutName: {
+        fontSize: 11,
+        color: '#333',
+        marginTop: 1,
+    },
+    eshotCalloutArrow: {
+        marginTop: -14,
+    },
     timelineList: { paddingBottom: Spacing.xl, paddingTop: Spacing.md },
     stepContainer: { flexDirection: 'row', minHeight: 60, paddingHorizontal: Spacing.lg },
     stepLeft: { width: 40, alignItems: 'center' },

@@ -8,19 +8,34 @@ import routeStopsRaw from '@/data/gtfs/route_stops.json';
 import { getAllDepartures, getRouteName, getRouteVehicles } from '@/services/transportApi';
 import { ApiResponseState, ApproachingBus } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 const routeShapes: Record<string, Record<string, number[][]>> = routeShapesRaw as any;
 const routeStopsData: Record<string, Record<string, string[]>> = routeStopsRaw as any;
 const gtfsStops: Record<string, { id: string, name: string, lat: number, lon: number }> = gtfsStopsRaw as any;
 
+const CustomPin = ({ iconName, color, size = 12 }: { iconName: string, color: string, size?: number }) => (
+    <View style={{ alignItems: 'center', justifyContent: 'center', width: size * 2.5, height: size * 2.5 }}>
+        <MaterialCommunityIcons name="map-marker" size={size * 2.5} color={color} style={{ position: 'absolute' }} />
+        <Ionicons name={iconName as any} size={size * 1.3} color={Colors.white} style={{ position: 'absolute', top: size * 0.3 }} />
+    </View>
+);
+
+const BusPin = () => (
+    <View style={styles.liveBusPin}>
+        <Ionicons name="bus" size={14} color={Colors.white} />
+    </View>
+);
+
 export default function RouteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>(); // Tıklanan Hat Numarası
+    const router = useRouter();
     const insets = useSafeAreaInsets();
     const { stops: allStops } = useStops();
     const { addFavoriteRoute, removeFavoriteRoute, isFavoriteRoute } = useFavorites();
@@ -92,6 +107,8 @@ export default function RouteDetailScreen() {
     const isFetchingRef = useRef(false);
     const mapRef = useRef<MapView>(null); // Harita kontrolü için Referans
     const timeListRef = useRef<FlatList>(null);
+    const [visibleStops, setVisibleStops] = useState<any[]>([]);
+    const [mapReady, setMapReady] = useState(false);
 
     const [nextDepartureIndex, setNextDepartureIndex] = useState<number>(-1);
 
@@ -137,6 +154,33 @@ export default function RouteDetailScreen() {
         }
         return () => clearTimeout(timer);
     }, [refreshCountdown]);
+
+    // Performans Optimizasyonu: Yüzlerce durağı haritaya yavaş yavaş (chunking) ekle
+    useEffect(() => {
+        if (!routeStops || routeStops.length === 0 || !mapReady) {
+            setVisibleStops([]);
+            return;
+        }
+        
+        let currentIndex = 0;
+        const chunkSize = 20; // Her 100ms'de 20 durak çiz
+        
+        // Ekran geçişi (transition) ve harita yüklemesi (native rendering) tamamen bitsin diye bekle
+        const initialDelay = setTimeout(() => {
+            const interval = setInterval(() => {
+                currentIndex += chunkSize;
+                setVisibleStops(routeStops.slice(0, currentIndex));
+                
+                if (currentIndex >= routeStops.length) {
+                    clearInterval(interval);
+                }
+            }, 100);
+
+            return () => clearInterval(interval);
+        }, 300);
+
+        return () => clearTimeout(initialDelay);
+    }, [routeStops, mapReady]);
 
     const fetchVehicles = useCallback(async (isAutoRefresh = false) => {
         // Zaten çekiyorsa veya kullanıcı manuel basıp cooldowndaysa iptal et
@@ -331,6 +375,7 @@ export default function RouteDetailScreen() {
                                             showsCompass={true}
                                             showsUserLocation={true}
                                             showsMyLocationButton={true}
+                                            onMapReady={() => setMapReady(true)}
                                             initialRegion={{
                                                 latitude: filteredVehicles?.[0]?.latitude || routeCoords[0]?.latitude || 38.4237,
                                                 longitude: filteredVehicles?.[0]?.longitude || routeCoords[0]?.longitude || 27.1428,
@@ -341,7 +386,7 @@ export default function RouteDetailScreen() {
                                             {routeCoords.length > 0 && (
                                                 <Polyline
                                                     coordinates={routeCoords}
-                                                    strokeColor={Colors.error}
+                                                    strokeColor="#000000"
                                                     strokeWidth={4}
                                                 />
                                             )}
@@ -358,17 +403,51 @@ export default function RouteDetailScreen() {
                                                         }, 400);
                                                     }}
                                                 >
-                                                    <View style={styles.busMarker}>
-                                                        <Ionicons name="bus" size={16} color={Colors.white} />
-                                                    </View>
+                                                    <BusPin />
                                                     <Callout tooltip>
-                                                        <View style={styles.calloutContainer}>
-                                                            <Text style={styles.calloutTitle}>Araç No: {bus.busId}</Text>
-                                                            {bus.direction && <Text style={styles.calloutSubtitle}>Yön: {bus.direction}</Text>}
+                                                        <View style={styles.eshotCalloutContainer}>
+                                                            <View style={styles.eshotCallout}>
+                                                                <View style={[styles.eshotCalloutLeft, { backgroundColor: '#E63946' }]}>
+                                                                    <MaterialCommunityIcons name="bus" size={16} color="white" />
+                                                                </View>
+                                                                <View style={styles.eshotCalloutRight}>
+                                                                    <Text style={styles.eshotCalloutId} numberOfLines={1}>{bus.busId}</Text>
+                                                                    {bus.direction && <Text style={styles.eshotCalloutName} numberOfLines={1}>Yön: {bus.direction}</Text>}
+                                                                </View>
+                                                            </View>
+                                                            <MaterialCommunityIcons name="menu-down" size={30} color="white" style={styles.eshotCalloutArrow} />
                                                         </View>
                                                     </Callout>
                                                 </Marker>
                                             ))}
+                                            {visibleStops.map((stop, idx) => {
+                                                const lat = Number(stop.lat || stop.latitude);
+                                                const lon = Number(stop.lon || stop.longitude);
+                                                if (isNaN(lat) || isNaN(lon)) return null;
+                                                return (
+                                                    <Marker
+                                                        key={`stop-${stop.id || stop.stopId}-${idx}`}
+                                                        coordinate={{ latitude: lat, longitude: lon }}
+                                                        tracksViewChanges={false}
+                                                    >
+                                                        <CustomPin iconName="bus" color="#1877F2" size={14} />
+                                                        <Callout tooltip onPress={() => router.push(`/stop/${stop.id || stop.stopId}`)}>
+                                                            <View style={styles.eshotCalloutContainer}>
+                                                                <View style={styles.eshotCallout}>
+                                                                    <View style={styles.eshotCalloutLeft}>
+                                                                        <Text style={styles.eshotCalloutIndex}>{idx + 1}</Text>
+                                                                    </View>
+                                                                    <View style={styles.eshotCalloutRight}>
+                                                                        <Text style={styles.eshotCalloutId} numberOfLines={1}>{stop.id || stop.stopId}</Text>
+                                                                        <Text style={styles.eshotCalloutName} numberOfLines={1}>{stop.name}</Text>
+                                                                    </View>
+                                                                </View>
+                                                                <MaterialCommunityIcons name="menu-down" size={30} color="white" style={styles.eshotCalloutArrow} />
+                                                            </View>
+                                                        </Callout>
+                                                    </Marker>
+                                                );
+                                            })}
                                         </MapView>
                                     </View>
 
@@ -588,6 +667,67 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         paddingHorizontal: Spacing.sm,
+    },
+    stopMarker: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: Colors.white,
+        borderWidth: 3,
+        borderColor: Colors.primary,
+    },
+    liveBusPin: {
+        backgroundColor: '#E63946',
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#fff',
+    },
+    eshotCalloutContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    eshotCallout: {
+        flexDirection: 'row',
+        backgroundColor: 'white',
+        overflow: 'hidden',
+        borderRadius: 2,
+        width: 170,
+        height: 44,
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    eshotCalloutLeft: {
+        width: 36,
+        backgroundColor: '#555555',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    eshotCalloutIndex: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    eshotCalloutRight: {
+        flex: 1,
+        paddingHorizontal: 8,
+        justifyContent: 'center',
+    },
+    eshotCalloutId: {
+        fontWeight: 'bold',
+        fontSize: 13,
+        color: '#000',
+    },
+    eshotCalloutName: {
+        fontSize: 11,
+        color: '#333',
+        marginTop: 1,
+    },
+    eshotCalloutArrow: {
+        marginTop: -14,
     },
     headerRouteNumber: {
         fontSize: FontSizes.xl,
