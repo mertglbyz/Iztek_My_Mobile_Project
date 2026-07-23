@@ -143,8 +143,6 @@ class BackendWalkingProvider implements WalkingRouteProvider {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         // HTTP 4xx / 5xx
         let errorBody: any = null;
@@ -161,6 +159,7 @@ class BackendWalkingProvider implements WalkingRouteProvider {
           `[BackendWalkingProvider] ${errorCode}: ${errorMsg}`
         );
       }
+
 
       const data = await response.json();
 
@@ -203,15 +202,14 @@ class BackendWalkingProvider implements WalkingRouteProvider {
         retrievedAt: data.retrievedAt ?? generateIsoTimestamp(),
       };
     } catch (error: any) {
-      clearTimeout(timeoutId);
-
       if (error?.name === 'AbortError') {
         throw new Error(
           `[BackendWalkingProvider] Timeout: ${this.timeoutMs}ms içinde yanıt alınamadı.`
         );
       }
-
       throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
@@ -314,6 +312,10 @@ class WalkingRouteCache {
       return null;
     }
 
+    // LRU: Hit olan veriyi silip tekrar set ederek sıranın en sonuna (en yeni konuma) taşıyoruz
+    this.store.delete(key);
+    this.store.set(key, entry);
+
     return entry.result;
   }
 
@@ -329,8 +331,11 @@ class WalkingRouteCache {
       to.longitude
     );
 
-    // LRU: maksimum kapasiteye ulaşıldıysa en eski kaydı sil
-    if (this.store.size >= this.maxSize) {
+    // Eğer key zaten varsa, önce siliyoruz ki maxSize'ı gereksiz artırmasın ve sıra olarak en sona eklensin
+    if (this.store.has(key)) {
+      this.store.delete(key);
+    } else if (this.store.size >= this.maxSize) {
+      // Sadece yeni bir kayıt eklenirken ve kapasite doluysa en eski (ilk) kaydı sil
       const oldestKey = this.store.keys().next().value;
       if (oldestKey) {
         this.store.delete(oldestKey);
@@ -449,6 +454,25 @@ export const getWalkingRoute = async (
   fromStopId?: string,
   toStopId?: string
 ): Promise<WalkingRouteResult> => {
+  // 0. Koordinat Validasyonu
+  const isValidCoord = (c: { latitude: number; longitude: number }) => 
+    typeof c?.latitude === 'number' && Number.isFinite(c.latitude) && c.latitude >= -90 && c.latitude <= 90 &&
+    typeof c?.longitude === 'number' && Number.isFinite(c.longitude) && c.longitude >= -180 && c.longitude <= 180;
+
+  if (!isValidCoord(fromCoordinate) || !isValidCoord(toCoordinate)) {
+    // Geçersiz koordinatsa Haversine bile doğru çalışmaz, doğrudan fallback objesi döndür
+    return {
+      fromStopId,
+      toStopId,
+      distanceMeters: 0,
+      durationSeconds: 0,
+      geometry: [],
+      source: 'approximate-haversine',
+      isApproximate: true,
+      retrievedAt: generateIsoTimestamp(),
+    };
+  }
+
   // 1. Cache kontrolü
   const cached = cache.get(fromCoordinate, toCoordinate);
   if (cached) {
@@ -475,7 +499,6 @@ export const getWalkingRoute = async (
 
   const primaryProvider = resolvePrimaryProvider();
   let result: WalkingRouteResult;
-  let usedFallback = false;
 
   try {
     // 3. Primary provider'ı dene
@@ -497,7 +520,6 @@ export const getWalkingRoute = async (
     console.warn(
       `[WalkingRouting] ${primaryProvider.providerName} başarısız: ${error?.message || error}. Haversine fallback'e geçiliyor.`
     );
-    usedFallback = true;
 
     result = await getHaversineProvider().getRoute(
       fromCoordinate,

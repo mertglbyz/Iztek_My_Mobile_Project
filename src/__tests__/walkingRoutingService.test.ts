@@ -129,22 +129,36 @@ describe('Faz 13 — Walking Routing Service (Provider + Cache + Fallback)', () 
     it('timeout durumunda Haversine fallback devreye girer', async () => {
       (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL = 'http://localhost:9999';
 
+      jest.useFakeTimers();
+
       const originalFetch = global.fetch;
-      // AbortError simülasyonu — backend'in timeout olması durumu
-      global.fetch = jest.fn(() =>
-        Promise.reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }))
+      // AbortError simülasyonu — signal tetiklenince fetch reject olur
+      global.fetch = jest.fn((url: any, options: any) =>
+        new Promise((resolve, reject) => {
+          if (options?.signal) {
+            options.signal.addEventListener('abort', () => {
+              reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }));
+            });
+          }
+        })
       ) as any;
 
-      const result = await getWalkingRoute(
+      const promise = getWalkingRoute(
         { latitude: 38.4, longitude: 27.1 },
         { latitude: 38.5, longitude: 27.2 }
       );
+
+      // 3 saniye ileri sar ve timeout'u tetikle
+      jest.advanceTimersByTime(3000);
+
+      const result = await promise;
 
       expect(result.source).toBe('approximate-haversine');
       expect(result.isApproximate).toBe(true);
 
       global.fetch = originalFetch;
       delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_API_BASE_URL;
+      jest.useRealTimers();
     });
 
     it('network hatasinda (fetch reject) Haversine fallback devreye girer', async () => {
@@ -288,66 +302,38 @@ describe('Faz 13 — Walking Routing Service (Provider + Cache + Fallback)', () 
 
   describe('Cache Mechanism', () => {
 
-    it('cache hit durumunda ikinci istek API ye gitmez', async () => {
+    it('cache hit durumunda ikinci istek provider getRoute metodunu cagirmaz', async () => {
       (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+      const mockProvider = _testing.getMockProvider();
+      const spy = jest.spyOn(mockProvider, 'getRoute');
 
       const fromCoord = { latitude: 38.4, longitude: 27.1 };
       const toCoord = { latitude: 38.5, longitude: 27.2 };
 
       await getWalkingRoute(fromCoord, toCoord);
       expect(getWalkingCacheSize()).toBe(1);
+      expect(spy).toHaveBeenCalledTimes(1);
 
       // İkinci çağrı aynı → cache'ten gelmeli
       await getWalkingRoute(fromCoord, toCoord);
       expect(getWalkingCacheSize()).toBe(1);
+      expect(spy).toHaveBeenCalledTimes(1); // artmamalı
 
+      spy.mockRestore();
       delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
     });
 
     it('cache key yon duyarlidir — A→B ile B→A farkli kayitlardir', async () => {
       (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
-
       const coordA = { latitude: 38.4, longitude: 27.1 };
       const coordB = { latitude: 38.5, longitude: 27.2 };
 
       await getWalkingRoute(coordA, coordB);
       const size1 = getWalkingCacheSize();
-
       await getWalkingRoute(coordB, coordA);
       const size2 = getWalkingCacheSize();
 
       expect(size2).toBe(size1 + 1);
-
-      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
-    });
-
-    it('ayni kordinatlara tekrar istek cache ten doner', async () => {
-      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
-
-      const fromCoord = { latitude: 38.4, longitude: 27.1 };
-      const toCoord = { latitude: 38.5, longitude: 27.2 };
-
-      const result1 = await getWalkingRoute(fromCoord, toCoord);
-      const result2 = await getWalkingRoute(fromCoord, toCoord);
-
-      expect(result2.distanceMeters).toBe(result1.distanceMeters);
-      expect(result2.source).toBe(result1.source);
-
-      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
-    });
-
-    it('clearWalkingCache dogru calisir', async () => {
-      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
-
-      await getWalkingRoute(
-        { latitude: 38.4, longitude: 27.1 },
-        { latitude: 38.5, longitude: 27.2 }
-      );
-      expect(getWalkingCacheSize()).toBeGreaterThan(0);
-
-      clearWalkingCache();
-      expect(getWalkingCacheSize()).toBe(0);
-
       delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
     });
 
@@ -357,9 +343,90 @@ describe('Faz 13 — Walking Routing Service (Provider + Cache + Fallback)', () 
       expect(getWalkingCacheSize()).toBe(0);
     });
 
-    it('cache.evictExpired zamani gecmis kayitlari temizler', () => {
-      const evicted = _testing.cache.evictExpired();
-      expect(evicted).toBe(0);
+    it('TTL (5 dk) suresi dolmus veriler get edildiginde silinir ve null doner', async () => {
+      jest.useFakeTimers();
+      (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED = 'true';
+      
+      const fromCoord = { latitude: 38.4, longitude: 27.1 };
+      const toCoord = { latitude: 38.5, longitude: 27.2 };
+
+      await getWalkingRoute(fromCoord, toCoord);
+      expect(getWalkingCacheSize()).toBe(1);
+
+      // 5 dakika 1 saniye ileri sar
+      jest.advanceTimersByTime(5 * 60 * 1000 + 1000);
+
+      const cached = _testing.cache.get(fromCoord, toCoord);
+      expect(cached).toBeNull();
+      expect(getWalkingCacheSize()).toBe(0);
+
+      delete (process.env as any).EXPO_PUBLIC_WALKING_ROUTING_MOCK_ENABLED;
+      jest.useRealTimers();
+    });
+
+    it('LRU kapasitesi 200 ile sinirlidir ve en eskiler silinir', () => {
+      // Doğrudan cache üzerinde test edeceğiz
+      const { cache } = _testing;
+      
+      // 205 tane kayıt ekleyelim
+      for (let i = 1; i <= 205; i++) {
+        cache.set(
+          { latitude: 38.4, longitude: 27.1 + i * 0.0001 },
+          { latitude: 38.5, longitude: 27.2 },
+          { distanceMeters: 100, durationSeconds: 50, geometry: [], source: 'mock', isApproximate: false, retrievedAt: 'date' } as any
+        );
+      }
+
+      // Kapasite 200'ü geçmemeli
+      expect(getWalkingCacheSize()).toBe(200);
+
+      // İlk eklenen (i=1..5) kayıtlar silinmiş olmalı
+      const firstOldest = cache.get(
+        { latitude: 38.4, longitude: 27.1 + 1 * 0.0001 },
+        { latitude: 38.5, longitude: 27.2 }
+      );
+      expect(firstOldest).toBeNull();
+    });
+
+    it('Cache hit oldugunda LRU siralamasinda en sona (MRU) tasinir', () => {
+      const { cache } = _testing;
+      
+      const coordA = { latitude: 10, longitude: 10 };
+      const coordB = { latitude: 20, longitude: 20 };
+      const coordC = { latitude: 30, longitude: 30 };
+      const to = { latitude: 0, longitude: 0 };
+      
+      const res = { distanceMeters: 100, durationSeconds: 50, geometry: [], source: 'mock', isApproximate: false, retrievedAt: 'date' } as any;
+
+      // 1. Kapasiteyi tam 200'e dolduralım (197 tane dummy ekleyelim)
+      for (let i = 1; i <= 197; i++) {
+        cache.set({ latitude: 1, longitude: i }, to, res);
+      }
+
+      // 2. Şimdi A, B, C'yi ekleyelim. Toplam 200 oldu.
+      // Sıra: [..., A, B, C]
+      cache.set(coordA, to, res);
+      cache.set(coordB, to, res);
+      cache.set(coordC, to, res);
+
+      // 3. A'yı okuyalım (Cache hit). A sıranın en sonuna geçmeli.
+      // Sıra: [..., B, C, A]
+      cache.get(coordA, to);
+
+      // 4. Şimdi kapasiteyi zorlamak için 199 yeni kayıt ekleyelim.
+      // Toplam kapasite 200 olduğu için en eski 199 kayıt silinecek.
+      // Mevcut sıra: [197 eski dummy, B, C, A] idi.
+      // 199 yeni kayıt eklendiğinde silinecekler: 197 eski dummy + B + C.
+      // Geriye sadece A (1) ve 199 yeni kayıt (toplam 200) kalmalı.
+      for (let i = 1; i <= 199; i++) {
+        cache.set({ latitude: 2, longitude: i }, to, res);
+      }
+      
+      // Artık B ve C silindi.
+      expect(cache.get(coordB, to)).toBeNull();
+      expect(cache.get(coordC, to)).toBeNull();
+      // A hala hayatta olmalı çünkü hit olduğu için MRU'ya taşınmıştı ve silinmekten kurtuldu.
+      expect(cache.get(coordA, to)).not.toBeNull();
     });
 
   });

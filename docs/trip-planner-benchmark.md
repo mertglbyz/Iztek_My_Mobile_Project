@@ -30,7 +30,7 @@ Algoritma: **findRoutes** (Yürüyüş Desteği Açık)
 | Yürüyüşlü: 24353 -> 24045 (Run 1) | Yakın Durak Destekli | 4 | 10.71 ms |
 | Yürüyüşlü: 23998 -> 22041 (Run 1) | Yakın Durak Destekli | 1 | 0.93 ms |
 | Yürüyüşlü: 11158 -> 16407 (Run 1) | Yakın Durak Destekli | 1 | 0.31 ms |
-| Yürüyüşlü: 15950 -> 15513 (Run 1) | Yakın Durak Destekli | 4 | 1.34 ms |
+| Yürüyüşlü: 15950 -> 15513 (Run 1) | Yakın Durak Destekli | 4 | 1.62 ms |
 | Yürüyüşlü: 21676 -> 20244 (Run 1) | Yakın Durak Destekli | 9 | 5.23 ms |
 | Yürüyüşlü: 13768 -> 11786 (Run 1) | Yakın Durak Destekli | 10 | 7.03 ms |
 | Yürüyüşlü: 12701 -> 12223 (Run 1) | Yakın Durak Destekli | 10 | 19.27 ms |

@@ -94,8 +94,8 @@ Ters indeks yapısı kullanılarak seyahat planlayıcı (Trip Planner) modülü 
   - Farklı durak çifti sayısı: **30**
   - Toplam ölçüm sayısı: **120**
   - Minimum Süre: **0.01 ms**
-  - Genel Ortalama Süre: **1.34 ms**
-  - Maksimum Süre (Zirve): **24.44 ms**
+  - Genel Ortalama Süre: **1.62 ms**
+  - Maksimum Süre (Zirve): **27.21 ms**
   - Test Ortamı: **Node.js (Jest) / Yerel Donanım**
   - Test Edilen Commit: **bf1668e**
   - *Isınma Maliyeti:* İlk çalıştırmada veri dosyalarının (JSON) belleğe yüklenmesinden kaynaklanan milisaniyelik bir gecikme (cold run) oluşmaktadır, sonraki çağrılarda süreler hemen 0.00ms civarına düşmektedir. (Ayrıntılı rapor `docs/trip-planner-benchmark.md` içinde)

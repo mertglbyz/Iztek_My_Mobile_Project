@@ -452,7 +452,7 @@ async function runImport() {
         try {
             const parsedOld = JSON.parse(oldStopsText);
             const oldStopsData = Array.isArray(parsedOld) ? parsedOld : Object.values(parsedOld);
-            
+
             let missingInGtfs = 0;
             let newlyDiscoveredInGtfs = 0;
             let nameMismatchCount = 0;
