@@ -8,7 +8,8 @@ import { getStopsForRoute } from '@/utils/routeData';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { ActivityIndicator, Animated, Dimensions, FlatList, PanResponder, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, FlatList, PanResponder, StyleSheet, Text, TouchableOpacity, View, Alert, Linking } from 'react-native';
+import * as Location from 'expo-location';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import { useActiveJourney } from '@/contexts/ActiveJourneyContext';
 
@@ -65,9 +66,33 @@ export default function TripDetailScreen() {
         })
     ).current;
 
-    const handleStartJourney = () => {
+    const handleStartJourney = async () => {
         if (!route) return;
         
+        try {
+            const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                if (canAskAgain) {
+                    const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+                    if (newStatus !== 'granted') {
+                        Alert.alert("Konum İzni Gerekli", "Yolculuk takibi yapabilmek için konum iznine ihtiyacımız var. Lütfen ayarlardan izin verin.", [
+                            { text: "İptal", style: "cancel" },
+                            { text: "Ayarlar", onPress: () => Linking.openSettings() }
+                        ]);
+                        return;
+                    }
+                } else {
+                    Alert.alert("Konum İzni Gerekli", "Yolculuk takibi yapabilmek için konum iznine ihtiyacımız var. Lütfen ayarlardan izin verin.", [
+                        { text: "İptal", style: "cancel" },
+                        { text: "Ayarlar", onPress: () => Linking.openSettings() }
+                    ]);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn("Konum izni alınırken hata oluştu", e);
+        }
+
         Alert.alert(
             "Yolculuğu Başlat",
             "Bu rota için aktif navigasyonu başlatmak istiyor musunuz?",

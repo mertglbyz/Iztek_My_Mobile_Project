@@ -1,6 +1,7 @@
 import { LocationPermissionStatus, UserLocation } from '@/types';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
+import { Linking } from 'react-native';
 
 interface UseLocationResult {
     location: UserLocation | null;
@@ -25,6 +26,13 @@ export function useLocation(): UseLocationResult {
                 setPermissionStatus('granted');
                 await fetchLocation();
             } else {
+                // If it was already denied before we requested (can be checked via getForegroundPermissionsAsync),
+                // but Expo's request function handles it by just returning 'denied' immediately.
+                // We'll prompt them to open settings.
+                const { canAskAgain } = await Location.getForegroundPermissionsAsync();
+                if (!canAskAgain) {
+                    Linking.openSettings();
+                }
                 setPermissionStatus('denied');
                 setError('Konum izni reddedildi. Lütfen ayarlardan izin verin.');
             }
