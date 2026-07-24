@@ -594,8 +594,8 @@ async function runImport() {
         return Math.round(R * c);
     }
 
-    // Grid ayarlaması ~0.002 = ~200 metre (Izmir enleminde)
-    const CELL_SIZE = 0.002;
+    // Grid ayarlaması ~0.03 = ~3000 metre (Izmir enleminde)
+    const CELL_SIZE = 0.03;
     const grid = {}; // { "lat_lon": [stop1, stop2] }
 
     plannerStops.forEach(stop => {
@@ -622,7 +622,8 @@ async function runImport() {
                     grid[neighborKey].forEach(neighborStop => {
                         if (stop.id !== neighborStop.id) {
                             const dist = getDistanceMeters(stop.latitude, stop.longitude, neighborStop.latitude, neighborStop.longitude);
-                            if (dist <= 150) {
+                            // Maksimum tarama alanı 3000 metre (3 km) olarak belirlendi
+                            if (dist <= 3000) {
                                 nearby.push({
                                     stopId: neighborStop.id,
                                     distanceMeters: dist
@@ -635,10 +636,24 @@ async function runImport() {
         }
 
         if (nearby.length > 0) {
-            // Mesafeye göre artan sıraya koy
             nearby.sort((a, b) => a.distanceMeters - b.distanceMeters);
-            nearbyStopsIndex[stop.id] = nearby;
-            totalConnections += nearby.length;
+            
+            // Adaptive Spatial Radius (Uyarlanabilir Çap) Filtrelemesi
+            const filteredNearby = nearby.filter((n, index) => {
+                // 1. Şehir Merkezi Kuralı: 750 metre altındakilerin HEPSİNİ al.
+                if (n.distanceMeters <= 750) return true;
+                
+                // 2. Köy Kuralı: Eğer 750m altında durak yoksa veya azsa bile, 
+                // en yakın 5 durağı her zaman garanti altına al (Maks 3 km'ye kadar).
+                if (index < 5) return true;
+                
+                return false;
+            });
+
+            if (filteredNearby.length > 0) {
+                nearbyStopsIndex[stop.id] = filteredNearby;
+                totalConnections += filteredNearby.length;
+            }
         }
     });
 

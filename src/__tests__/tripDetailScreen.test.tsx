@@ -21,6 +21,14 @@ jest.mock('@/services/tripPlanner', () => ({
     findRoutes: jest.fn()
 }));
 
+// Mock ActiveJourneyContext
+jest.mock('@/contexts/ActiveJourneyContext', () => ({
+    useActiveJourney: jest.fn(() => ({
+        activeJourney: null,
+        dispatch: jest.fn()
+    }))
+}));
+
 // Mock react-native
 jest.mock('react-native', () => ({
     ActivityIndicator: 'ActivityIndicator',
@@ -155,8 +163,11 @@ describe('Trip Detail Screen Tests', () => {
             await new Promise(resolve => setTimeout(resolve, 10));
         });
 
-        const output = JSON.stringify(component.toJSON());
-        expect(output).toContain('GTFS güzergâhı eksik (Kuş uçuşu iptal)');
+        const textNodes = component.root.findAllByType('Text');
+        const hasWarning = textNodes.some((node: any) => 
+            node.props.children && typeof node.props.children === 'string' && node.props.children.includes('GTFS güzergâhı eksik')
+        );
+        expect(hasWarning).toBe(true);
         component.unmount();
     });
 

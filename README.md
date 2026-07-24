@@ -169,8 +169,33 @@ Detaylı teknik doküman için: `docs/faz-13-walking-routing.md`
 ### Faz 13 Kapanış Notları
 - **Harita Deneyimi:** Sentetik/Mock rotalar düz hat ve net görünümlerle kullanıcıya aktarılmaktadır.
 - **Optimizasyonlar:** Arama çubuklarında tespit edilen focus hataları çözülmüş, `FlatList` entegrasyonu düzeltilmiştir. Harita yükleme süreleri hızlandırılmış ve bellek sızıntıları giderilmiştir.
-- **5 test suite**, **64 otomatik test** başarıyla tamamlanmış ve izole edilmiş ortamda doğrulanmıştır.
+- **6 test suite**, **72 otomatik test** başarıyla tamamlanmış ve izole edilmiş ortamda doğrulanmıştır.
 - API Sözleşmesi `docs/walking-routing-api-contract.md` eksiksiz oluşturulmuştur.
+
+## Faz 14 – Aktif Yolculuk Takibi ve Durak İlerleme Modu
+
+Bu fazda uygulamanın sadece statik rota sunma işlevi genişletilerek, kullanıcının GPS konumu ile yolculuğunu canlı olarak takip edebilmesi sağlanmıştır.
+
+### Merkezi Yolculuk State Modeli
+`ActiveJourneyContext` ile yönetilen yolculuk; bekleme, yürüme, birinci otobüs, aktarma, ikinci otobüs, varış gibi toplam 12 farklı duruma (`idle`, `walking_to_boarding`, `on_first_vehicle`, `transferring` vb.) sahiptir. Kullanıcı onayları ile durumlar arası güvenli geçiş sağlanır.
+
+### Durak İlerleme Algoritması (Progress Algorithm)
+Kullanıcının GPS koordinatları ile otobüsün güzergâhı karşılaştırılarak sıradaki durak ve geçilen durak sayısı hesaplanır. GPS dalgalanmalarına karşı **Ardışık Onay (Consecutive Hit)** mekanizması (ör. aynı durağa en az 2 ardışık eşleşme) ve **Geri Dönmeme (Forward-only)** kuralları ile sapmalar engellenir.
+
+### Konum Sağlayıcılar (Location Providers)
+Gerçek cihaz konumunu dinleyen `ExpoLocationProvider` ve test/simülasyon amaçlı sentetik GPS verisi üreten `MockJourneyLocationProvider` entegre edilmiştir. Uygulama, arka planda değil, aktif ekrandayken (foreground) çalışacak şekilde optimize edilmiştir.
+
+### Kullanıcı Onaylı İlerleme Akışı
+Yalnızca GPS üzerinden otomatik durum değişimlerinin (bindi/indi) yanıltıcı olabileceği öngörülerek, "Bindim", "İndim", "Aktarma Yaptım" gibi durum değişiklikleri kullanıcı onayına bağlanmıştır.
+
+### AsyncStorage ile Kalıcı Takip
+Aktif yolculuk bilgileri asenkron olarak yerel belleğe (AsyncStorage) kaydedilir. Uygulama kapansa bile son geçerli yolculuk durumu geri yüklenerek kalınan yerden devam edilebilir.
+
+Detaylı mimari dokümanlar:
+- `docs/faz-14-active-journey.md`
+- `docs/journey-state-machine.md`
+- `docs/location-progress-algorithm.md`
+- `docs/faz-14-test-report.md`
 
 ## Kurulum ve Test (Geliştiriciler İçin)
 1. `npm install` — Expo ve React bağımlılıklarını kur.

@@ -3,6 +3,7 @@ import { StopsProvider } from '@/context/StopsContext';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { ActiveJourneyProvider } from '@/contexts/ActiveJourneyContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -12,10 +13,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <StopsProvider>
-      <FavoritesProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </FavoritesProvider>
-    </StopsProvider>
+    <ActiveJourneyProvider>
+      <StopsProvider>
+        <FavoritesProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </FavoritesProvider>
+      </StopsProvider>
+    </ActiveJourneyProvider>
   );
 }

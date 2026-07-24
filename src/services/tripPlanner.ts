@@ -120,174 +120,180 @@ export const findRoutes = async (startStopId: string, endStopId: string): Promis
     const startCandidates = getCandidates(startStopId);
     const endCandidates = getCandidates(endStopId);
 
+    // Pre-aggregate best candidate per route+direction for start to prevent combinatorial explosion
+    const bestStartRoutes = new Map<string, { candId: string, walkMeters: number, routeId: string, directionId: string }>();
+    for (const cand of startCandidates) {
+        const info = stopRoutesIndex[cand.id];
+        if (!info) continue;
+        for (const r of info) {
+            const key = `${r.routeId}-${r.directionId}`;
+            const existing = bestStartRoutes.get(key);
+            if (!existing || cand.walkMeters < existing.walkMeters) {
+                bestStartRoutes.set(key, { candId: cand.id, walkMeters: cand.walkMeters, routeId: r.routeId, directionId: r.directionId });
+            }
+        }
+    }
+
+    // Pre-aggregate best candidate per route+direction for end
+    const bestEndRoutes = new Map<string, { candId: string, walkMeters: number, routeId: string, directionId: string }>();
+    for (const cand of endCandidates) {
+        const info = stopRoutesIndex[cand.id];
+        if (!info) continue;
+        for (const r of info) {
+            const key = `${r.routeId}-${r.directionId}`;
+            const existing = bestEndRoutes.get(key);
+            if (!existing || cand.walkMeters < existing.walkMeters) {
+                bestEndRoutes.set(key, { candId: cand.id, walkMeters: cand.walkMeters, routeId: r.routeId, directionId: r.directionId });
+            }
+        }
+    }
+
     const directMap = new Map<string, DirectRouteResult>();
     const transferMap = new Map<string, TransferRouteResult>();
 
-    // 1. AKTARMASIZ (Tüm pattern'lar ve yakın duraklar taranarak)
-    for (const startCand of startCandidates) {
-        const startInfo = stopRoutesIndex[startCand.id];
-        if (!startInfo) continue;
+    // 1. AKTARMASIZ (Tüm pattern'lar ve benzersiz rotalar taranarak)
+    for (const start of bestStartRoutes.values()) {
+        const end = bestEndRoutes.get(`${start.routeId}-${start.directionId}`);
+        if (!end) continue;
 
-        for (const endCand of endCandidates) {
-            const endInfo = stopRoutesIndex[endCand.id];
-            if (!endInfo) continue;
+        const patterns = routePatterns[start.routeId]?.[start.directionId];
+        if (!patterns) continue;
 
-            for (const start of startInfo) {
-                for (const end of endInfo) {
-                    if (start.routeId === end.routeId && start.directionId === end.directionId) {
-                        const patterns = routePatterns[start.routeId]?.[start.directionId];
-                        if (!patterns) continue;
+        for (const pattern of patterns) {
+            const startIdx = pattern.stopIds.indexOf(start.candId);
+            const endIdx = pattern.stopIds.indexOf(end.candId);
 
-                        for (const pattern of patterns) {
-                            const startIdx = pattern.stopIds.indexOf(startCand.id);
-                            const endIdx = pattern.stopIds.indexOf(endCand.id);
+            if (startIdx !== -1 && endIdx !== -1 && startIdx < endIdx) {
+                const dupKey = `${start.routeId}-${start.directionId}`;
+                const totalWalk = start.walkMeters + end.walkMeters;
 
-                            if (startIdx !== -1 && endIdx !== -1 && startIdx < endIdx) {
-                                const dupKey = `${start.routeId}-${start.directionId}`;
-                                const totalWalk = startCand.walkMeters + endCand.walkMeters;
+                const existing = directMap.get(dupKey);
+                const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
 
-                                const existing = directMap.get(dupKey);
-                                const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
+                if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && (endIdx - startIdx) < existing.stopCount)) {
+                    const tripContext = patternTripShapeIndex[pattern.patternId];
+                    const segmentStopIds = pattern.stopIds.slice(startIdx, endIdx + 1);
 
-                                if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && (endIdx - startIdx) < existing.stopCount)) {
-                                    const tripContext = patternTripShapeIndex[pattern.patternId];
-                                    const segmentStopIds = pattern.stopIds.slice(startIdx, endIdx + 1);
+                    // Deterministik resultId
+                    const resultId = `${start.routeId}_${start.directionId}_${pattern.patternId}_${start.candId}_${end.candId}`;
 
-                                    // Deterministik resultId
-                                    const resultId = `${start.routeId}_${start.directionId}_${pattern.patternId}_${startCand.id}_${endCand.id}`;
-
-                                    directMap.set(dupKey, {
-                                        resultId,
-                                        type: 'direct',
-                                        routeId: start.routeId,
-                                        directionId: start.directionId,
-                                        patternId: pattern.patternId,
-                                        tripId: tripContext?.representativeTripId || '',
-                                        shapeId: tripContext?.shapeId || null,
-                                        segmentStopIds,
-                                        boardingStopId: startStopId,
-                                        alightingStopId: endStopId,
-                                        actualBoardingStopId: startCand.id !== startStopId ? startCand.id : undefined,
-                                        actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
-                                        walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
-                                        walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
-                                        walkingToBoardingDuration: startCand.walkMeters > 0 ? Math.round(startCand.walkMeters / 1.4) : undefined,
-                                        walkingFromAlightingDuration: endCand.walkMeters > 0 ? Math.round(endCand.walkMeters / 1.4) : undefined,
-                                        totalWalkingMeters: totalWalk,
-                                        isApproximate: true,
-                                        stopCount: endIdx - startIdx,
-                                        totalStopCount: endIdx - startIdx,
-                                        transferCount: 0
-                                    });
-                                }
-                                break;
-                            }
-                        }
-                    }
+                    directMap.set(dupKey, {
+                        resultId,
+                        type: 'direct',
+                        routeId: start.routeId,
+                        directionId: start.directionId,
+                        patternId: pattern.patternId,
+                        tripId: tripContext?.representativeTripId || '',
+                        shapeId: tripContext?.shapeId || null,
+                        segmentStopIds,
+                        boardingStopId: startStopId,
+                        alightingStopId: endStopId,
+                        actualBoardingStopId: start.candId !== startStopId ? start.candId : undefined,
+                        actualAlightingStopId: end.candId !== endStopId ? end.candId : undefined,
+                        walkingToBoardingMeters: start.walkMeters > 0 ? start.walkMeters : undefined,
+                        walkingFromAlightingMeters: end.walkMeters > 0 ? end.walkMeters : undefined,
+                        walkingToBoardingDuration: start.walkMeters > 0 ? Math.round(start.walkMeters / 1.4) : undefined,
+                        walkingFromAlightingDuration: end.walkMeters > 0 ? Math.round(end.walkMeters / 1.4) : undefined,
+                        totalWalkingMeters: totalWalk,
+                        isApproximate: true,
+                        stopCount: endIdx - startIdx,
+                        totalStopCount: endIdx - startIdx,
+                        transferCount: 0
+                    });
                 }
+                break;
             }
         }
     }
 
     // 2. TEK AKTARMALI (Transfer)
-    for (const startCand of startCandidates) {
-        const startInfo = stopRoutesIndex[startCand.id];
-        if (!startInfo) continue;
+    for (const start of bestStartRoutes.values()) {
+        const startPatterns = routePatterns[start.routeId]?.[start.directionId];
+        if (!startPatterns) continue;
 
-        for (const endCand of endCandidates) {
-            const endInfo = stopRoutesIndex[endCand.id];
-            if (!endInfo) continue;
+        for (const end of bestEndRoutes.values()) {
+            if (start.routeId === end.routeId) continue;
 
-            for (const start of startInfo) {
-                const startPatterns = routePatterns[start.routeId]?.[start.directionId];
-                if (!startPatterns) continue;
+            const endPatterns = routePatterns[end.routeId]?.[end.directionId];
+            if (!endPatterns) continue;
 
-                for (const end of endInfo) {
-                    if (start.routeId === end.routeId) continue;
+            for (const startPattern of startPatterns) {
+                const startIdx = startPattern.stopIds.indexOf(start.candId);
+                if (startIdx === -1) continue;
 
-                    const endPatterns = routePatterns[end.routeId]?.[end.directionId];
-                    if (!endPatterns) continue;
+                for (const endPattern of endPatterns) {
+                    const endIdx = endPattern.stopIds.indexOf(end.candId);
+                    if (endIdx === -1) continue;
 
-                    for (const startPattern of startPatterns) {
-                        const startIdx = startPattern.stopIds.indexOf(startCand.id);
-                        if (startIdx === -1) continue;
+                    let bestTransferStopId: string | null = null;
+                    let bestTotalStops = Infinity;
+                    let firstSegmentStops = 0;
+                    let secondSegmentStops = 0;
 
-                        for (const endPattern of endPatterns) {
-                            const endIdx = endPattern.stopIds.indexOf(endCand.id);
-                            if (endIdx === -1) continue;
+                    for (let i = startIdx + 1; i < startPattern.stopIds.length; i++) {
+                        const contenderStop = startPattern.stopIds[i];
+                        const j = endPattern.stopIds.indexOf(contenderStop);
 
-                            let bestTransferStopId: string | null = null;
-                            let bestTotalStops = Infinity;
-                            let firstSegmentStops = 0;
-                            let secondSegmentStops = 0;
+                        if (j !== -1 && j < endIdx) {
+                            const currentFirstStops = i - startIdx;
+                            const currentSecondStops = endIdx - j;
+                            const totalStops = currentFirstStops + currentSecondStops;
 
-                            for (let i = startIdx + 1; i < startPattern.stopIds.length; i++) {
-                                const contenderStop = startPattern.stopIds[i];
-                                const j = endPattern.stopIds.indexOf(contenderStop);
-
-                                if (j !== -1 && j < endIdx) {
-                                    const currentFirstStops = i - startIdx;
-                                    const currentSecondStops = endIdx - j;
-                                    const totalStops = currentFirstStops + currentSecondStops;
-
-                                    if (totalStops < bestTotalStops) {
-                                        bestTotalStops = totalStops;
-                                        bestTransferStopId = contenderStop;
-                                        firstSegmentStops = currentFirstStops;
-                                        secondSegmentStops = currentSecondStops;
-                                    }
-                                }
+                            if (totalStops < bestTotalStops) {
+                                bestTotalStops = totalStops;
+                                bestTransferStopId = contenderStop;
+                                firstSegmentStops = currentFirstStops;
+                                secondSegmentStops = currentSecondStops;
                             }
+                        }
+                    }
 
-                            if (bestTransferStopId) {
-                                const dupKey = `${start.routeId}-${start.directionId}-${end.routeId}-${end.directionId}`;
-                                const totalWalk = startCand.walkMeters + endCand.walkMeters;
-                                const existing = transferMap.get(dupKey);
-                                const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
+                    if (bestTransferStopId) {
+                        const dupKey = `${start.routeId}-${start.directionId}-${end.routeId}-${end.directionId}`;
+                        const totalWalk = start.walkMeters + end.walkMeters;
+                        const existing = transferMap.get(dupKey);
+                        const existingWalk = existing ? existing.totalWalkingMeters : Infinity;
 
-                                if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && bestTotalStops < existing.totalStopCount)) {
-                                    const firstTripContext = patternTripShapeIndex[startPattern.patternId];
-                                    const secondTripContext = patternTripShapeIndex[endPattern.patternId];
+                        if (!existing || totalWalk < existingWalk || (totalWalk === existingWalk && bestTotalStops < existing.totalStopCount)) {
+                            const firstTripContext = patternTripShapeIndex[startPattern.patternId];
+                            const secondTripContext = patternTripShapeIndex[endPattern.patternId];
 
-                                    const firstSegmentStopIds = startPattern.stopIds.slice(startIdx, startPattern.stopIds.indexOf(bestTransferStopId) + 1);
-                                    const secondSegmentStopIds = endPattern.stopIds.slice(endPattern.stopIds.indexOf(bestTransferStopId), endIdx + 1);
+                            const firstSegmentStopIds = startPattern.stopIds.slice(startIdx, startPattern.stopIds.indexOf(bestTransferStopId) + 1);
+                            const secondSegmentStopIds = endPattern.stopIds.slice(endPattern.stopIds.indexOf(bestTransferStopId), endIdx + 1);
 
-                                    // Deterministik resultId
-                                    const resultId = `${start.routeId}_${start.directionId}_${startPattern.patternId}_${startCand.id}_${bestTransferStopId}_${end.routeId}_${end.directionId}_${endPattern.patternId}_${endCand.id}`;
+                            const resultId = `${start.routeId}_${start.directionId}_${startPattern.patternId}_${start.candId}_${bestTransferStopId}_${end.routeId}_${end.directionId}_${endPattern.patternId}_${end.candId}`;
 
-                                    transferMap.set(dupKey, {
-                                        resultId,
-                                        type: 'transfer',
-                                        firstRouteId: start.routeId,
-                                        firstDirectionId: start.directionId,
-                                        secondRouteId: end.routeId,
-                                        secondDirectionId: end.directionId,
-                                        firstPatternId: startPattern.patternId,
-                                        secondPatternId: endPattern.patternId,
-                                        firstTripId: firstTripContext?.representativeTripId || '',
-                                        secondTripId: secondTripContext?.representativeTripId || '',
-                                        firstShapeId: firstTripContext?.shapeId || null,
-                                        secondShapeId: secondTripContext?.shapeId || null,
-                                        firstSegmentStopIds,
-                                        secondSegmentStopIds,
-                                        boardingStopId: startStopId,
-                                        transferStopId: bestTransferStopId,
-                                        alightingStopId: endStopId,
-                                        actualBoardingStopId: startCand.id !== startStopId ? startCand.id : undefined,
-                                        actualAlightingStopId: endCand.id !== endStopId ? endCand.id : undefined,
-                                        walkingToBoardingMeters: startCand.walkMeters > 0 ? startCand.walkMeters : undefined,
-                                        walkingFromAlightingMeters: endCand.walkMeters > 0 ? endCand.walkMeters : undefined,
-                                        walkingToBoardingDuration: startCand.walkMeters > 0 ? Math.round(startCand.walkMeters / 1.4) : undefined,
-                                        walkingFromAlightingDuration: endCand.walkMeters > 0 ? Math.round(endCand.walkMeters / 1.4) : undefined,
-                                        totalWalkingMeters: totalWalk,
-                                        isApproximate: true,
-                                        firstSegmentStopCount: firstSegmentStops,
-                                        secondSegmentStopCount: secondSegmentStops,
-                                        totalStopCount: bestTotalStops,
-                                        transferCount: 1
-                                    });
-                                }
-                            }
+                            transferMap.set(dupKey, {
+                                resultId,
+                                type: 'transfer',
+                                firstRouteId: start.routeId,
+                                firstDirectionId: start.directionId,
+                                secondRouteId: end.routeId,
+                                secondDirectionId: end.directionId,
+                                firstPatternId: startPattern.patternId,
+                                secondPatternId: endPattern.patternId,
+                                firstTripId: firstTripContext?.representativeTripId || '',
+                                secondTripId: secondTripContext?.representativeTripId || '',
+                                firstShapeId: firstTripContext?.shapeId || null,
+                                secondShapeId: secondTripContext?.shapeId || null,
+                                firstSegmentStopIds,
+                                secondSegmentStopIds,
+                                boardingStopId: startStopId,
+                                transferStopId: bestTransferStopId,
+                                alightingStopId: endStopId,
+                                actualBoardingStopId: start.candId !== startStopId ? start.candId : undefined,
+                                actualAlightingStopId: end.candId !== endStopId ? end.candId : undefined,
+                                walkingToBoardingMeters: start.walkMeters > 0 ? start.walkMeters : undefined,
+                                walkingFromAlightingMeters: end.walkMeters > 0 ? end.walkMeters : undefined,
+                                walkingToBoardingDuration: start.walkMeters > 0 ? Math.round(start.walkMeters / 1.4) : undefined,
+                                walkingFromAlightingDuration: end.walkMeters > 0 ? Math.round(end.walkMeters / 1.4) : undefined,
+                                totalWalkingMeters: totalWalk,
+                                isApproximate: true,
+                                firstSegmentStopCount: firstSegmentStops,
+                                secondSegmentStopCount: secondSegmentStops,
+                                totalStopCount: bestTotalStops,
+                                transferCount: 1
+                            });
                         }
                     }
                 }

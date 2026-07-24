@@ -7,9 +7,10 @@ import { WalkingRouteResult } from '@/types';
 import { getStopsForRoute } from '@/utils/routeData';
 import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, FlatList, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { ActivityIndicator, Animated, Dimensions, FlatList, PanResponder, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
+import { useActiveJourney } from '@/contexts/ActiveJourneyContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -17,6 +18,7 @@ interface MapData {
     markers: { id: string, stopId?: string, coord: { latitude: number, longitude: number }, title: string, type: 'start' | 'transfer' | 'end' | 'waypoint', color?: string }[];
     busPolylines: { coords: { latitude: number, longitude: number }[], color: string }[];
     walkPolylines: { coords: { latitude: number, longitude: number }[], isApproximate: boolean }[];
+    fullCoords: { latitude: number, longitude: number }[];
 }
 
 const getStopNameById = (id: string) => {
@@ -27,12 +29,14 @@ const getStopNameById = (id: string) => {
 export default function TripDetailScreen() {
     const { resultId, startStopId, endStopId } = useLocalSearchParams();
     const router = useRouter();
+    const { dispatch } = useActiveJourney();
 
     const [route, setRoute] = useState<TripPlanResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState<MapData | null>(null);
     const [shapeMissingWarning, setShapeMissingWarning] = useState(false);
     const [loadingWalking, setLoadingWalking] = useState(false);
+    const [mapReady, setMapReady] = useState(false);
     const mapRef = useRef<MapView>(null);
 
     // Bottom Sheet Animation
@@ -60,6 +64,29 @@ export default function TripDetailScreen() {
             },
         })
     ).current;
+
+    const handleStartJourney = () => {
+        if (!route) return;
+        
+        Alert.alert(
+            "Yolculuğu Başlat",
+            "Bu rota için aktif navigasyonu başlatmak istiyor musunuz?",
+            [
+                { text: "İptal", style: "cancel" },
+                { 
+                    text: "Başlat", 
+                    style: "default",
+                    onPress: () => {
+                        dispatch({ 
+                            type: 'START_JOURNEY', 
+                            payload: { route, journeyId: Date.now().toString() } 
+                        });
+                        router.push('/journey/active');
+                    }
+                }
+            ]
+        );
+    };
 
     useEffect(() => {
         // Explicit parametre validasyonu
@@ -105,7 +132,7 @@ export default function TripDetailScreen() {
         let isMounted = true;
         let timer: NodeJS.Timeout;
         const loadMap = async () => {
-            const mData: MapData = { markers: [], busPolylines: [], walkPolylines: [] };
+            const mData: Omit<MapData, 'fullCoords'> = { markers: [], busPolylines: [], walkPolylines: [] };
             let missingShape = false;
             const fullCoords: { latitude: number, longitude: number }[] = [];
 
@@ -200,27 +227,31 @@ export default function TripDetailScreen() {
 
             if (isMounted) {
                 // Tüm duraklar, otobüs hatları ve yürüyüş yolları tamamlandıktan sonra haritayı güncelle
-                setMapData({...mData});
+                setMapData({...mData, fullCoords});
                 setShapeMissingWarning(missingShape);
                 setLoadingWalking(false);
-
-                timer = setTimeout(() => {
-                    if (mapRef.current && fullCoords.length > 0) {
-                        mapRef.current.fitToCoordinates(fullCoords, {
-                            edgePadding: { top: 40, right: 40, bottom: (SCREEN_HEIGHT - INITIAL_SHEET_Y) + 40, left: 40 },
-                            animated: true,
-                        });
-                    }
-                }, 600);
             }
         };
 
         loadMap();
         return () => { 
             isMounted = false;
-            if (timer) clearTimeout(timer);
         };
     }, [route]);
+
+    useEffect(() => {
+        if (mapReady && mapData && mapData.fullCoords.length > 0 && mapRef.current) {
+            // Harita render olduktan hemen sonra koordinatlara fit ediyoruz.
+            // Timeout kullanıyoruz çünkü layout'un tamamen hesaplanması için ufak bir bekleme (100ms) gerekiyor.
+            const fitTimer = setTimeout(() => {
+                mapRef.current?.fitToCoordinates(mapData.fullCoords, {
+                    edgePadding: { top: 40, right: 40, bottom: (SCREEN_HEIGHT - INITIAL_SHEET_Y) + 40, left: 40 },
+                    animated: true,
+                });
+            }, 100);
+            return () => clearTimeout(fitTimer);
+        }
+    }, [mapReady, mapData]);
 
     const buildTimeline = (r: TripPlanResult) => {
         const steps: any[] = [];
@@ -405,8 +436,8 @@ export default function TripDetailScreen() {
                 activeOpacity={0.7}
             >
                 <View style={styles.stepLeft}>
-                    <View style={[styles.stepIconContainer, item.type === 'walk' && { backgroundColor: item.isApproximate ? Colors.gray300 : Colors.successSoft }]}>
-                        <Ionicons name={item.icon} size={18} color={item.type === 'walk' ? (item.isApproximate ? Colors.textSecondary : Colors.success) : Colors.primary} />
+                    <View style={[styles.stepIconContainer, item.type === 'walk' && { backgroundColor: item.isApproximate ? Colors.gray300 : Colors.accentSoft }]}>
+                        <Ionicons name={item.icon} size={18} color={item.type === 'walk' ? (item.isApproximate ? Colors.textSecondary : Colors.accent) : Colors.primary} />
                     </View>
                     {!isLast && (
                         <View style={[
@@ -414,7 +445,7 @@ export default function TripDetailScreen() {
                             (item.type === 'walk' || (steps[index + 1] && steps[index + 1].type === 'walk')) 
                                 ? (item.isApproximate || (steps[index + 1] && steps[index + 1].isApproximate) 
                                     ? { borderStyle: 'dashed', borderWidth: 1, borderColor: Colors.textDisabled, backgroundColor: 'transparent' } 
-                                    : { backgroundColor: Colors.success })
+                                    : { backgroundColor: Colors.accent })
                                 : {}
                         ]} />
                     )}
@@ -438,6 +469,7 @@ export default function TripDetailScreen() {
                     <MapView
                         ref={mapRef}
                         style={StyleSheet.absoluteFillObject}
+                        onMapReady={() => setMapReady(true)}
                         initialRegion={mapData.markers[0] ? {
                             latitude: mapData.markers[0].coord.latitude,
                             longitude: mapData.markers[0].coord.longitude,
@@ -449,7 +481,7 @@ export default function TripDetailScreen() {
                             <Polyline 
                                 key={`walk-${i}-${wp.coords.length}`} 
                                 coordinates={wp.coords} 
-                                strokeColor={wp.isApproximate ? Colors.textSecondary : Colors.success} 
+                                strokeColor={wp.isApproximate ? Colors.textSecondary : Colors.accent} 
                                 strokeWidth={wp.isApproximate ? 4 : 6} 
                                 lineDashPattern={wp.isApproximate ? [5, 10] : undefined} 
                                 zIndex={2} 
@@ -514,19 +546,6 @@ export default function TripDetailScreen() {
                                 </Marker>
                             );
                         })}
-                        {mapData.walkPolylines.map((wp, i) => (
-                            <Polyline 
-                                key={`walk-${i}-${wp.coords.length}`} 
-                                coordinates={wp.coords} 
-                                strokeColor={wp.isApproximate ? Colors.textSecondary : Colors.success} 
-                                strokeWidth={wp.isApproximate ? 4 : 6} 
-                                lineDashPattern={wp.isApproximate ? [5, 10] : undefined} 
-                                zIndex={2} 
-                            />
-                        ))}
-                        {mapData.busPolylines.map((bp, i) => (
-                            <Polyline key={`bus-${i}`} coordinates={bp.coords} strokeColor={bp.color} strokeWidth={5} zIndex={1} />
-                        ))}
                     </MapView>
                 ) : (
                     <ActivityIndicator size="large" color={Colors.primary} />
@@ -586,6 +605,18 @@ export default function TripDetailScreen() {
                     contentContainerStyle={styles.timelineList}
                     bounces={true}
                     showsVerticalScrollIndicator={false}
+                    ListFooterComponent={
+                        <View style={{ padding: Spacing.lg, paddingBottom: Spacing.xl * 2 }}>
+                            <TouchableOpacity 
+                                style={styles.startJourneyBtn} 
+                                onPress={handleStartJourney}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="navigate" size={24} color={Colors.white} style={{ marginRight: 8 }} />
+                                <Text style={styles.startJourneyBtnText}>Yolculuğu Başlat</Text>
+                            </TouchableOpacity>
+                        </View>
+                    }
                 />
             </Animated.View>
         </View>
@@ -598,6 +629,24 @@ const styles = StyleSheet.create({
     errorText: { fontSize: FontSizes.md, color: Colors.textSecondary, textAlign: 'center', marginVertical: Spacing.md },
     fallbackBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md },
     fallbackBtnText: { color: Colors.white, fontWeight: FontWeights.bold },
+    startJourneyBtn: {
+        backgroundColor: Colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: BorderRadius.lg,
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6
+    },
+    startJourneyBtnText: {
+        color: Colors.white,
+        fontSize: FontSizes.lg,
+        fontWeight: FontWeights.bold
+    },
     mapBackgroundContainer: { position: 'absolute', top: 0, left: 0, right: 0, height: '100%' },
     mapPlaceholder: { flex: 1, backgroundColor: Colors.gray300, justifyContent: 'center', alignItems: 'center' },
     bottomSheetContainer: {

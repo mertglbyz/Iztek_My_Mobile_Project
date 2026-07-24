@@ -50,3 +50,7 @@ eshot-otobus-duraklari.csv
 !docs/trip-detail-tests.md
 !docs/walking-routing-api-contract.md
 !docs/faz-13-walking-routing.md
+!docs/faz-14-active-journey.md
+!docs/journey-state-machine.md
+!docs/location-progress-algorithm.md
+!docs/faz-14-test-report.md

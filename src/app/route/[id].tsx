@@ -109,8 +109,37 @@ export default function RouteDetailScreen() {
     const timeListRef = useRef<FlatList>(null);
     const [visibleStops, setVisibleStops] = useState<any[]>([]);
     const [mapReady, setMapReady] = useState(false);
+    const [markerCounter, setMarkerCounter] = useState(0);
+
+    // Initial marker rendering fix
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (mapReady) {
+            interval = setInterval(() => {
+                setMarkerCounter(prev => {
+                    if (prev >= 4) {
+                        clearInterval(interval);
+                        return prev;
+                    }
+                    return prev + 1;
+                });
+            }, 500);
+        }
+        return () => clearInterval(interval);
+    }, [mapReady]);
 
     const [nextDepartureIndex, setNextDepartureIndex] = useState<number>(-1);
+
+    // Otobüs marker'larının render sorunu için özel izleme durumu
+    const [busTracksViewChanges, setBusTracksViewChanges] = useState(true);
+
+    useEffect(() => {
+        setBusTracksViewChanges(true);
+        const timer = setTimeout(() => {
+            setBusTracksViewChanges(false);
+        }, 1000); // Veri geldikten sonra 1 saniye boyunca render izni ver
+        return () => clearTimeout(timer);
+    }, [filteredVehicles]);
 
     // Otomatik odaklama (Auto-Scroll) - Sefer Saatleri İçin
     useEffect(() => {
@@ -392,8 +421,9 @@ export default function RouteDetailScreen() {
                                             )}
                                             {filteredVehicles?.map((bus, idx) => (
                                                 <Marker
-                                                    key={`bus-${bus.busId}-${idx}`}
+                                                    key={`bus-${bus.busId}`}
                                                     coordinate={{ latitude: bus.latitude as number, longitude: bus.longitude as number }}
+                                                    tracksViewChanges={busTracksViewChanges}
                                                     onPress={() => {
                                                         mapRef.current?.animateToRegion({
                                                             latitude: bus.latitude as number,
@@ -428,7 +458,7 @@ export default function RouteDetailScreen() {
                                                     <Marker
                                                         key={`stop-${stop.id || stop.stopId}-${idx}`}
                                                         coordinate={{ latitude: lat, longitude: lon }}
-                                                        tracksViewChanges={false}
+                                                        tracksViewChanges={markerCounter < 4}
                                                     >
                                                         <CustomPin iconName="bus" color="#1877F2" size={14} />
                                                         <Callout tooltip onPress={() => router.push(`/stop/${stop.id || stop.stopId}`)}>

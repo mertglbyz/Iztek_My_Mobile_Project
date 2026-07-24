@@ -99,12 +99,12 @@ describe('Trip Planner Algorithm Tests', () => {
         expect(hasWalk).toBe(true);
     });
 
-    // Test 9: 150m üstündeki uzak duraklar yürüyüş adayı olarak işlenmemeli
-    it('150m siniri uzerindeki uzak duraklar adaya alinmaz (Test 9)', async () => {
+    // Test 9: 800m üstündeki uzak duraklar yürüyüş adayı olarak işlenmemeli
+    it('800m siniri uzerindeki uzak duraklar adaya alinmaz (Test 9)', async () => {
         // 10030 -> 11464: yakın durak indeksi çalışmaması beklenen uzak durak çifti
         const results = await findRoutes('10030', '11464');
         const hasDistantWalk = results.some(
-            r => r.walkingFromAlightingMeters && r.walkingFromAlightingMeters > 150
+            r => r.walkingFromAlightingMeters && r.walkingFromAlightingMeters > 800
         );
         expect(hasDistantWalk).toBe(false);
     });
