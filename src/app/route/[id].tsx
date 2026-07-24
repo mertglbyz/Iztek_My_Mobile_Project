@@ -133,6 +133,16 @@ export default function RouteDetailScreen() {
     // Otobüs marker'larının render sorunu için özel izleme durumu
     const [busTracksViewChanges, setBusTracksViewChanges] = useState(true);
 
+    const filteredVehicles = useMemo(() => {
+        if (!vehiclesState.data) return [];
+        const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
+
+        return vehiclesState.data.filter(bus => {
+            if (!bus.latitude || !bus.longitude) return false;
+            return String(bus.direction) === expectedDirStr;
+        });
+    }, [vehiclesState.data, selectedDirection]);
+
     useEffect(() => {
         setBusTracksViewChanges(true);
         const timer = setTimeout(() => {
@@ -265,16 +275,6 @@ export default function RouteDetailScreen() {
         const interval = setInterval(() => fetchVehicles(true), 15000); // UI Perfonmansı ve Canlı Vektör için 15 saniyeye düşürüldü
         return () => clearInterval(interval);
     }, [fetchVehicles]);
-
-    const filteredVehicles = useMemo(() => {
-        if (!vehiclesState.data) return [];
-        const expectedDirStr = selectedDirection === '0' ? 'Gidiş' : 'Dönüş';
-
-        return vehiclesState.data.filter(bus => {
-            if (!bus.latitude || !bus.longitude) return false;
-            return String(bus.direction) === expectedDirStr;
-        });
-    }, [vehiclesState.data, selectedDirection]);
 
     // Eğer bu numaradan geçen hiçbir durak yoksa (veya geçersiz input ise) Hata Ekranı
     if (routeStops.length === 0) {
